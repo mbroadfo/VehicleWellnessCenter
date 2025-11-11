@@ -1,0 +1,33 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Serverless backend for Vehicle Wellness Center",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:connection": "ts-node src/test-connection.ts",
+    "init:collections": "ts-node src/init-collections.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.8"
+  },
+  "dependencies": {
+    "mongodb": "^7.0.0"
+  }
+}

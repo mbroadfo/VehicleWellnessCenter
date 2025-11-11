@@ -1,0 +1,37 @@
+// Generated initialization script for MongoDB Atlas collections.
+// Run with: mongosh "<connection string>" collections-init.js
+
+const databaseName = "${database_name}";
+const vehiclesDefinition = JSON.parse('${vehicles_definition}'.replace(/\"/g, '"'));
+const fleetsDefinition = JSON.parse('${fleets_definition}'.replace(/\"/g, '"'));
+const vehicleEventsDefinition = JSON.parse('${vehicle_events_definition}'.replace(/\"/g, '"'));
+
+(function init() {
+  const targetDb = db.getSiblingDB(databaseName);
+
+  function ensureCollection(def) {
+    const { name, options = {}, indexes = [] } = def;
+
+    if (!targetDb.getCollectionNames().includes(name)) {
+      console.log(`Creating collection: $${name}`);
+      targetDb.createCollection(name, options);
+    } else {
+      console.log(`Collection already exists: $${name}`);
+      if (options && Object.keys(options).length > 0) {
+        targetDb.runCommand({ collMod: name, ...options });
+      }
+    }
+
+    indexes.forEach((indexSpec) => {
+      const { keys, options: indexOptions = {} } = indexSpec;
+      console.log(`Ensuring index $${indexOptions.name || JSON.stringify(keys)} on $${name}`);
+      targetDb.getCollection(name).createIndex(keys, indexOptions);
+    });
+  }
+
+  ensureCollection(vehiclesDefinition);
+  ensureCollection(fleetsDefinition);
+  ensureCollection(vehicleEventsDefinition);
+
+  console.log("Initialization complete.");
+})();

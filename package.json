@@ -1,0 +1,44 @@
+{
+  "name": "vehicle-wellness-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vehicle Wellness Center - Full-stack vehicle maintenance tracking application",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "lint": "npm run lint --workspaces",
+    "lint:backend": "npm run lint --workspace=backend",
+    "lint:frontend": "npm run lint --workspace=frontend",
+    "test": "npm run test --workspaces",
+    "test:backend": "npm run test --workspace=backend",
+    "test:backend:watch": "npm run test:watch --workspace=backend",
+    "test:connection": "npm run test:connection --workspace=backend",
+    "init:collections": "npm run init:collections --workspace=backend",
+    "typecheck": "npm run typecheck --workspaces",
+    "typecheck:backend": "npm run typecheck --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "clean": "npm run clean --workspaces --if-present",
+    "clean:all": "npm run clean && rm -rf node_modules backend/node_modules frontend/node_modules"
+  },
+  "keywords": [
+    "vehicle",
+    "maintenance",
+    "tracking",
+    "mongodb",
+    "aws",
+    "lambda",
+    "react"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

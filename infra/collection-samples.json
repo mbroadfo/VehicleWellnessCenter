@@ -1,0 +1,76 @@
+{
+  "vehicles": {
+    "name": "vehicles",
+    "options": {
+      "validator": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["vin", "name", "acquiredAt"],
+          "properties": {
+            "vin": { "bsonType": "string", "description": "Vehicle identification number", "minLength": 11 },
+            "name": { "bsonType": "string", "description": "Friendly display name" },
+            "acquiredAt": { "bsonType": "date", "description": "Acquisition timestamp" },
+            "initialOdometer": { "bsonType": ["int", "long", "double"], "minimum": 0 },
+            "currentOdometer": { "bsonType": ["int", "long", "double"], "minimum": 0 },
+            "attributes": { "bsonType": "object" },
+            "valuation": {
+              "bsonType": ["object", "null"],
+              "properties": {
+                "amount": { "bsonType": ["double", "decimal", "int", "long"] },
+                "currency": { "bsonType": "string" },
+                "source": { "bsonType": "string" },
+                "asOf": { "bsonType": "date" }
+              }
+            },
+            "ownership": {
+              "bsonType": ["object", "null"],
+              "properties": {
+                "ownerId": { "bsonType": "string" },
+                "ownerName": { "bsonType": "string" },
+                "garageLocation": { "bsonType": "string" }
+              }
+            },
+            "tags": { "bsonType": ["array", "null"], "items": { "bsonType": "string" } },
+            "createdAt": { "bsonType": ["date", "null"] },
+            "updatedAt": { "bsonType": ["date", "null"] }
+          }
+        }
+      },
+      "validationAction": "warn"
+    },
+    "indexes": [
+      { "keys": { "vin": 1 }, "options": { "name": "uk_vehicle_vin", "unique": true } },
+      { "keys": { "ownerId": 1, "vin": 1 }, "options": { "name": "ix_vehicle_owner_vin" } }
+    ]
+  },
+  "vehicleEvents": {
+    "name": "vehicleEvents",
+    "options": {
+      "validator": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["vehicleId", "occurredAt", "type", "summary"],
+          "properties": {
+            "vehicleId": { "bsonType": "objectId", "description": "Reference to vehicles._id" },
+            "occurredAt": { "bsonType": "date" },
+            "recordedAt": { "bsonType": ["date", "null"] },
+            "type": { "bsonType": "string" },
+            "emoji": { "bsonType": ["string", "null"] },
+            "summary": { "bsonType": "string" },
+            "details": { "bsonType": ["object", "null"] },
+            "source": { "bsonType": ["object", "null"] },
+            "forecast": { "bsonType": ["object", "null"] },
+            "createdBy": { "bsonType": ["object", "null"] },
+            "createdAt": { "bsonType": ["date", "null"] },
+            "updatedAt": { "bsonType": ["date", "null"] }
+          }
+        }
+      },
+      "validationAction": "warn"
+    },
+    "indexes": [
+      { "keys": { "vehicleId": 1, "occurredAt": -1 }, "options": { "name": "ix_vehicle_timeline" } },
+      { "keys": { "type": 1, "occurredAt": -1 }, "options": { "name": "ix_event_type_time" } }
+    ]
+  }
+}
