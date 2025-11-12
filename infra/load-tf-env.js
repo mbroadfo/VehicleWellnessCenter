@@ -68,6 +68,22 @@ if (process.argv.length > 2) {
   const args = process.argv.slice(2);
   const command = args.join(' ');
   
+  // Auto-format Terraform files before plan or apply
+  if (command.includes('terraform plan') || command.includes('terraform apply')) {
+    console.log('🎨 Formatting Terraform files...');
+    try {
+      const path = require('path');
+      const infraDir = path.dirname(__filename);
+      execSync('terraform fmt', { 
+        cwd: infraDir,
+        stdio: 'inherit'
+      });
+      console.log('✅ Terraform files formatted\n');
+    } catch (error) {
+      console.warn('⚠️  terraform fmt failed, continuing anyway...\n');
+    }
+  }
+  
   console.log(`Executing: ${command}\n`);
   
   try {

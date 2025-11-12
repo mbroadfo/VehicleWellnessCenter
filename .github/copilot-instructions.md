@@ -75,6 +75,7 @@ DEVELOPMENT RULES:
 - Infrastructure commands use `npm run infra:*` (plan, apply, destroy) - credentials loaded via `infra/load-tf-env.js`.
 - Test utilities should auto-cleanup without manual intervention - avoid Ctrl+C patterns that block automation.
 - Application deployment uses `npm run deploy` for fast Lambda code updates without Terraform.
+- Terraform files are automatically formatted with `terraform fmt` before plan/apply operations.
 - API Gateway HTTP API v2 logging requires CloudWatch Logs resource policies, not IAM roles like REST APIs.
 - IAM policy `terraform-vwc-core` must be iteratively updated as Terraform reveals missing permissions.
 - CloudWatch log retention should be 3 days for cost optimization in dev environment.
@@ -157,7 +158,7 @@ When the user indicates a milestone has been reached, execute this checklist sys
 - Run `npm run typecheck` - resolve all type errors
 - Run `npm run test` - ensure all tests pass
 - Check for any build warnings
-- Run `terraform fmt` in `infra/` to format Terraform files
+- Terraform files are auto-formatted (no manual action needed)
 - Review ESLint config for any disabled rules that should be re-enabled
 
 ### 7. Update Copilot Instructions

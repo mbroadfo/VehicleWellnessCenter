@@ -92,6 +92,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Backend**: Seed script simplified - removed Ctrl+C requirement for cleanup
   - Now auto-cleans after brief pause instead of waiting for SIGINT
   - Improves developer experience and CI/CD compatibility
+- **Infrastructure**: Auto-format Terraform files before plan/apply operations
+  - `load-tf-env.js` now runs `terraform fmt` automatically
+  - Ensures consistent code style without manual intervention
 - **Infrastructure**: Simplified npm scripts - moved credential loading into wrapper script
 - **Infrastructure**: Separated infra management (`infra:*`) from app deployment (`deploy`)
 - **DevOps**: Eliminated all PowerShell dependencies - 100% Node.js tooling for cross-platform support
@@ -116,3 +119,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - IAM policy iteratively refined through multiple Terraform apply cycles
 - Build system uses archiver v7.0.1 for reliable ZIP creation
 - All tooling now Node.js-based for Windows/Mac/Linux compatibility
+- Terraform files auto-formatted before plan/apply - no manual `terraform fmt` needed
