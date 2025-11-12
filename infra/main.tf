@@ -438,3 +438,156 @@ output "lambda_execution_role_arn" {
   description = "ARN of the IAM role for Lambda function execution"
   value       = aws_iam_role.vwc_lambda_exec.arn
 }
+
+# ============================================================================
+# Lambda Functions
+# ============================================================================
+
+resource "aws_lambda_function" "get_vehicle_overview" {
+  filename      = "${path.module}/lambda-getVehicleOverview.zip"
+  function_name = "vwc-getVehicleOverview-${var.environment}"
+  role          = aws_iam_role.vwc_lambda_exec.arn
+  handler       = "getVehicleOverview.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 30
+  memory_size   = 512
+
+  source_code_hash = filebase64sha256("${path.module}/lambda-getVehicleOverview.zip")
+
+  environment {
+    variables = {
+      AWS_SECRET_ID    = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
+      MONGODB_DATABASE = "vehicle_wellness_center"
+      NODE_ENV         = var.environment
+    }
+  }
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "get_vehicle_overview" {
+  name              = "/aws/lambda/${aws_lambda_function.get_vehicle_overview.function_name}"
+  retention_in_days = 3
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# ============================================================================
+# API Gateway (HTTP API)
+# ============================================================================
+
+resource "aws_apigatewayv2_api" "vwc_api" {
+  name          = "vwc-api-${var.environment}"
+  protocol_type = "HTTP"
+  description   = "Vehicle Wellness Center API"
+
+  cors_configuration {
+    allow_origins = ["*"] # TODO: Restrict to frontend domain in production
+    allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers = ["Content-Type", "Authorization"]
+    max_age       = 300
+  }
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_apigatewayv2_stage" "default" {
+  api_id      = aws_apigatewayv2_api.vwc_api.id
+  name        = "$default"
+  auto_deploy = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      protocol       = "$context.protocol"
+      responseLength = "$context.responseLength"
+    })
+  }
+}
+
+resource "aws_cloudwatch_log_group" "api_gateway" {
+  name              = "/aws/apigateway/vwc-api-${var.environment}"
+  retention_in_days = 3
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# CloudWatch Logs resource policy to allow API Gateway to write logs
+resource "aws_cloudwatch_log_resource_policy" "api_gateway" {
+  policy_name = "vwc-apigateway-logging-policy"
+
+  policy_document = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.api_gateway.arn}:*"
+      }
+    ]
+  })
+}
+
+# Integration for getVehicleOverview
+resource "aws_apigatewayv2_integration" "get_vehicle_overview" {
+  api_id                 = aws_apigatewayv2_api.vwc_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.get_vehicle_overview.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "get_vehicle_overview" {
+  api_id    = aws_apigatewayv2_api.vwc_api.id
+  route_key = "GET /vehicles/{vehicleId}/overview"
+  target    = "integrations/${aws_apigatewayv2_integration.get_vehicle_overview.id}"
+}
+
+resource "aws_lambda_permission" "api_gateway_get_vehicle_overview" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.get_vehicle_overview.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.vwc_api.execution_arn}/*/*"
+}
+
+# ============================================================================
+# Outputs
+# ============================================================================
+
+output "api_gateway_url" {
+  description = "URL for the API Gateway endpoint"
+  value       = aws_apigatewayv2_api.vwc_api.api_endpoint
+}
+
+output "get_vehicle_overview_function_name" {
+  description = "Name of the getVehicleOverview Lambda function"
+  value       = aws_lambda_function.get_vehicle_overview.function_name
+}
