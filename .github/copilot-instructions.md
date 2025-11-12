@@ -73,6 +73,7 @@ DEVELOPMENT RULES:
 - All tooling must be Node.js-based for cross-platform compatibility - no PowerShell, Bash, or OS-specific scripts.
 - Lambda deployment packages are built with `backend/scripts/build-lambda.js` using archiver package.
 - Infrastructure commands use `npm run infra:*` (plan, apply, destroy) - credentials loaded via `infra/load-tf-env.js`.
+- Test utilities should auto-cleanup without manual intervention - avoid Ctrl+C patterns that block automation.
 - Application deployment uses `npm run deploy` for fast Lambda code updates without Terraform.
 - API Gateway HTTP API v2 logging requires CloudWatch Logs resource policies, not IAM roles like REST APIs.
 - IAM policy `terraform-vwc-core` must be iteratively updated as Terraform reveals missing permissions.

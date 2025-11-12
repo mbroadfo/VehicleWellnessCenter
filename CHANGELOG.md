@@ -54,6 +54,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Backend**: Pure Node.js Lambda build system (`scripts/build-lambda.js`) using archiver package
   - Creates ZIP deployment packages with compiled code and production dependencies
   - Replaces OS-specific PowerShell scripts for cross-platform compatibility
+- **Backend**: Test data seeding utility (`src/seed-test-data.ts`)
+  - Creates sample 2021 Honda Accord with 5 maintenance events
+  - Cleanup-first pattern: removes existing test VIN before seeding
+  - Upsert operations for idempotent execution
+  - Auto-cleanup after 3 seconds (no manual intervention required)
+  - Outputs test API URL for immediate validation
 - **Infrastructure**: Lambda function resource with 512MB memory, 30s timeout, Node.js 20 runtime
 - **Infrastructure**: API Gateway HTTP API v2 with CORS configuration
   - Route: `GET /vehicles/{vehicleId}/overview`
@@ -68,6 +74,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `infra:init`, `infra:plan`, `infra:apply`, `infra:destroy` - Terraform operations
   - `deploy` - Build Lambda package and update function code (fast iteration)
   - `build:lambda` - Create Lambda deployment ZIP
+- **DevOps**: Cross-platform environment variable handling using `cross-env` package
+  - NPM scripts now set `AWS_PROFILE=terraform-vwc` inline
+  - Works on Windows PowerShell, Mac/Linux bash
+  - Applied to `test:connection`, `init:collections`, `seed:test` scripts
 - **DevOps**: IAM policy `terraform-vwc-core` with comprehensive permissions (9 statement blocks)
   - IAM role management for vwc-* roles
   - PassRole permissions for lambda.amazonaws.com and apigateway.amazonaws.com
@@ -79,20 +89,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - **Backend**: ESLint configuration updated to disable unsafe type rules for test files
+- **Backend**: Seed script simplified - removed Ctrl+C requirement for cleanup
+  - Now auto-cleans after brief pause instead of waiting for SIGINT
+  - Improves developer experience and CI/CD compatibility
 - **Infrastructure**: Simplified npm scripts - moved credential loading into wrapper script
 - **Infrastructure**: Separated infra management (`infra:*`) from app deployment (`deploy`)
 - **DevOps**: Eliminated all PowerShell dependencies - 100% Node.js tooling for cross-platform support
 
-### Removed - Deprecated Scripts
+### Removed
 
 - **DevOps**: Removed `load-aws-credentials.ps1` and `load-terraform-vars.ps1` (replaced by `load-tf-env.js`)
 
-### Infrastructure - Deployed Resources
+### Deployed Infrastructure
 
 - API endpoint: `https://lrq8kagxo1.execute-api.us-west-2.amazonaws.com`
 - Lambda function: `vwc-getVehicleOverview-dev` (3.87 MB deployment package)
 - Lambda execution role: `arn:aws:iam::491696534851:role/vwc-lambda-execution-role`
 - CloudWatch log groups with 3-day retention for cost optimization
+- MongoDB Atlas IP whitelist configured to allow Lambda connections (0.0.0.0/0)
+- End-to-end validation: API endpoint returning vehicle overview data successfully
 
 ### Technical Notes
 

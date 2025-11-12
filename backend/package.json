@@ -11,8 +11,9 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:connection": "ts-node src/test-connection.ts",
-    "init:collections": "ts-node src/init-collections.ts"
+    "test:connection": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/test-connection.ts",
+    "init:collections": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/init-collections.ts",
+    "seed:test": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/seed-test-data.ts"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +24,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
     "archiver": "^7.0.1",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "ts-node": "^10.9.2",

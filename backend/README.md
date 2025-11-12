@@ -18,6 +18,7 @@ npm run build:backend      # Compile TypeScript to dist/
 npm run test:backend       # Run unit tests with Vitest
 npm run test:backend:watch # Run tests in watch mode
 npm run test:connection    # Test MongoDB Atlas connection via Secrets Manager
+npm run seed:test          # Seed test data for API validation (auto-cleans after 3s)
 ```
 
 ### Lint & Type Check
@@ -31,9 +32,15 @@ npm run typecheck:backend  # Type check with TypeScript compiler
 
 Lambda functions use IAM role-based authentication and retrieve MongoDB credentials from AWS Secrets Manager at runtime.
 
+### Implemented Functions
+
+- **getVehicleOverview** (`src/getVehicleOverview.ts`) – Retrieve vehicle details, event count, and recent events
+  - Route: `GET /vehicles/{vehicleId}/overview`
+  - Returns: Vehicle details + last 5 events
+  - Validates ObjectId format, handles 400/404/500 errors
+
 ### Planned Functions
 
-- **getVehicleOverview** – Retrieve vehicle details and summary statistics
 - **listVehicleEvents** – Query vehicle events with filtering and pagination
 - **recordVehicleEvent** – Create new maintenance/incident records
 - **chatVehicleHistory** – AI-powered conversational vehicle insights
@@ -46,13 +53,14 @@ All Lambda functions connect to MongoDB Atlas using credentials retrieved from A
 - Region: `us-west-2`
 - Required fields: `MONGODB_ATLAS_HOST`, `MONGODB_ATLAS_USERNAME`, `MONGODB_ATLAS_PASSWORD`
 
-## Testing
+## Testing & Utilities
+
+### MongoDB Connection Test
 
 The `test-connection.ts` script validates MongoDB connectivity:
 
 ```powershell
 # From project root
-. .\load-aws-credentials.ps1
 npm run test:connection
 ```
 
@@ -61,6 +69,24 @@ This verifies:
 - AWS Secrets Manager access
 - MongoDB Atlas connectivity
 - Database and collection visibility
+
+### Test Data Seeding
+
+The `seed-test-data.ts` script creates a sample vehicle and events for API testing:
+
+```powershell
+# From project root
+npm run seed:test
+```
+
+This script:
+
+- Removes any existing test data (VIN: 1HGBH41JXMN109186)
+- Inserts a sample 2021 Honda Accord with 5 maintenance events
+- Displays the test API URL
+- Auto-cleans up after 3 seconds
+
+Use this for quick end-to-end validation of deployed Lambda functions.
 
 ## Dependencies
 
