@@ -70,6 +70,13 @@ DEVELOPMENT RULES:
 - All workspace packages (backend, frontend) must have `typecheck` and `test` scripts for root-level npm workspace commands to work.
 - Always run `terraform fmt` in infra/ before committing Terraform changes.
 - Region is us-west-2 for all AWS and Atlas resources - update any us-east-1 references found in documentation.
+- All tooling must be Node.js-based for cross-platform compatibility - no PowerShell, Bash, or OS-specific scripts.
+- Lambda deployment packages are built with `backend/scripts/build-lambda.js` using archiver package.
+- Infrastructure commands use `npm run infra:*` (plan, apply, destroy) - credentials loaded via `infra/load-tf-env.js`.
+- Application deployment uses `npm run deploy` for fast Lambda code updates without Terraform.
+- API Gateway HTTP API v2 logging requires CloudWatch Logs resource policies, not IAM roles like REST APIs.
+- IAM policy `terraform-vwc-core` must be iteratively updated as Terraform reveals missing permissions.
+- CloudWatch log retention should be 3 days for cost optimization in dev environment.
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.

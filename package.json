@@ -12,6 +12,7 @@
     "build": "npm run build --workspaces",
     "build:backend": "npm run build --workspace=backend",
     "build:frontend": "npm run build --workspace=frontend",
+    "build:lambda": "npm run build:lambda --workspace=backend",
     "lint": "npm run lint --workspaces",
     "lint:backend": "npm run lint --workspace=backend",
     "lint:frontend": "npm run lint --workspace=frontend",
@@ -23,6 +24,11 @@
     "typecheck": "npm run typecheck --workspaces",
     "typecheck:backend": "npm run typecheck --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
+    "infra:init": "node infra/load-tf-env.js terraform init",
+    "infra:plan": "node infra/load-tf-env.js terraform plan",
+    "infra:apply": "node infra/load-tf-env.js terraform apply -auto-approve",
+    "infra:destroy": "node infra/load-tf-env.js terraform destroy",
+    "deploy": "npm run build:lambda && aws lambda update-function-code --function-name vwc-getVehicleOverview-dev --zip-file fileb://infra/lambda-getVehicleOverview.zip --profile terraform-vwc --region us-west-2",
     "clean": "npm run clean --workspaces --if-present",
     "clean:all": "npm run clean && rm -rf node_modules backend/node_modules frontend/node_modules"
   },
@@ -40,5 +46,8 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.157"
   }
 }

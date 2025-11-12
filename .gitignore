@@ -8,6 +8,8 @@ infra/terraform.tfstate
 infra/terraform.tfstate.backup
 infra/*.tfvars
 infra/collections-init.js
+infra/lambda-*.zip
+backend/dist/lambda-package/
 
 # Environment files
 .env
