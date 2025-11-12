@@ -39,9 +39,15 @@ Lambda functions use IAM role-based authentication and retrieve MongoDB credenti
   - Returns: Vehicle details + last 5 events
   - Validates ObjectId format, handles 400/404/500 errors
 
+- **listVehicleEvents** (`src/listVehicleEvents.ts`) – Query vehicle events with pagination and filtering
+  - Route: `GET /vehicles/{vehicleId}/events?limit=10&offset=0&type=oil_change`
+  - Query params: `limit` (1-100, default 10), `offset` (default 0), `type` (optional filter)
+  - Returns: Paginated events sorted by date (newest first)
+  - Includes pagination metadata: totalCount, hasMore, nextOffset
+  - Validates vehicleId and query parameters
+
 ### Planned Functions
 
-- **listVehicleEvents** – Query vehicle events with filtering and pagination
 - **recordVehicleEvent** – Create new maintenance/incident records
 - **chatVehicleHistory** – AI-powered conversational vehicle insights
 

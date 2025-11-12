@@ -170,6 +170,7 @@ async function seedTestData() {
     console.log(`  ✅ Deleted ${deleteVehicleResult.deletedCount} vehicle`);
     
     console.log('✅ Cleanup complete');
+    process.exit(0);
   } catch (error) {
     console.error('❌ Error during cleanup:', error);
     process.exit(1);

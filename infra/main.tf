@@ -579,6 +579,69 @@ resource "aws_lambda_permission" "api_gateway_get_vehicle_overview" {
 }
 
 # ============================================================================
+# Lambda Function: listVehicleEvents
+# ============================================================================
+
+resource "aws_lambda_function" "list_vehicle_events" {
+  filename      = "${path.module}/lambda-listVehicleEvents.zip"
+  function_name = "vwc-listVehicleEvents-${var.environment}"
+  role          = aws_iam_role.vwc_lambda_exec.arn
+  handler       = "listVehicleEvents.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 30
+  memory_size   = 512
+
+  source_code_hash = filebase64sha256("${path.module}/lambda-listVehicleEvents.zip")
+
+  environment {
+    variables = {
+      AWS_SECRET_ID    = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
+      MONGODB_DATABASE = "vehicle_wellness_center"
+      NODE_ENV         = var.environment
+    }
+  }
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "list_vehicle_events" {
+  name              = "/aws/lambda/${aws_lambda_function.list_vehicle_events.function_name}"
+  retention_in_days = 3
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# Integration for listVehicleEvents
+resource "aws_apigatewayv2_integration" "list_vehicle_events" {
+  api_id                 = aws_apigatewayv2_api.vwc_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.list_vehicle_events.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "list_vehicle_events" {
+  api_id    = aws_apigatewayv2_api.vwc_api.id
+  route_key = "GET /vehicles/{vehicleId}/events"
+  target    = "integrations/${aws_apigatewayv2_integration.list_vehicle_events.id}"
+}
+
+resource "aws_lambda_permission" "api_gateway_list_vehicle_events" {
+  statement_id  = "AllowAPIGatewayInvokeListEvents"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.list_vehicle_events.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.vwc_api.execution_arn}/*/*"
+}
+
+# ============================================================================
 # Outputs
 # ============================================================================
 

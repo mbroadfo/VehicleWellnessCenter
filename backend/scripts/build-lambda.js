@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * Build Lambda deployment package for getVehicleOverview
+ * Build Lambda deployment package
  * Pure Node.js implementation - no PowerShell dependency
+ * 
+ * Usage: node build-lambda.js <functionName>
+ * Example: node build-lambda.js getVehicleOverview
  */
 
 const fs = require('fs');
@@ -9,13 +12,22 @@ const path = require('path');
 const { execSync } = require('child_process');
 const archiver = require('archiver');
 
+// Get function name from command line argument
+const functionName = process.argv[2];
+if (!functionName) {
+  console.error('❌ Error: Function name required');
+  console.error('Usage: node build-lambda.js <functionName>');
+  console.error('Example: node build-lambda.js getVehicleOverview');
+  process.exit(1);
+}
+
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const PACKAGE_DIR = path.join(DIST_DIR, 'lambda-package');
 const INFRA_DIR = path.resolve(ROOT_DIR, '..', 'infra');
-const ZIP_PATH = path.join(INFRA_DIR, 'lambda-getVehicleOverview.zip');
+const ZIP_PATH = path.join(INFRA_DIR, `lambda-${functionName}.zip`);
 
-console.log('Building Lambda deployment package...\n');
+console.log(`Building Lambda deployment package for ${functionName}...\n`);
 
 // Clean previous build
 if (fs.existsSync(DIST_DIR)) {

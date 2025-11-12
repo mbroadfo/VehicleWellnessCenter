@@ -54,11 +54,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Backend**: Pure Node.js Lambda build system (`scripts/build-lambda.js`) using archiver package
   - Creates ZIP deployment packages with compiled code and production dependencies
   - Replaces OS-specific PowerShell scripts for cross-platform compatibility
+- **Backend**: Lambda function `listVehicleEvents` for paginated event retrieval
+  - Route: `GET /vehicles/{vehicleId}/events`
+  - Query parameters: limit (max 100), offset, type (event type filter)
+  - Returns paginated events sorted by date (newest first)
+  - Includes pagination metadata (totalCount, hasMore, nextOffset)
+  - Full input validation with unit tests
 - **Backend**: Test data seeding utility (`src/seed-test-data.ts`)
   - Creates sample 2021 Honda Accord with 5 maintenance events
   - Cleanup-first pattern: removes existing test VIN before seeding
   - Upsert operations for idempotent execution
-  - Auto-cleanup after 3 seconds (no manual intervention required)
+  - Auto-cleanup after 3 seconds with proper process termination
   - Outputs test API URL for immediate validation
 - **Infrastructure**: Lambda function resource with 512MB memory, 30s timeout, Node.js 20 runtime
 - **Infrastructure**: API Gateway HTTP API v2 with CORS configuration
@@ -89,15 +95,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - **Backend**: ESLint configuration updated to disable unsafe type rules for test files
-- **Backend**: Seed script simplified - removed Ctrl+C requirement for cleanup
-  - Now auto-cleans after brief pause instead of waiting for SIGINT
+- **Backend**: Seed script improvements
+  - Removed Ctrl+C requirement - now auto-cleans after brief pause
+  - Fixed hanging issue - properly exits with `process.exit(0)` after cleanup
   - Improves developer experience and CI/CD compatibility
+- **Backend**: Lambda build system now accepts function name as parameter
+  - Supports building multiple Lambda functions from single script
+  - Usage: `node build-lambda.js <functionName>`
 - **Infrastructure**: Auto-format Terraform files before plan/apply operations
   - `load-tf-env.js` now runs `terraform fmt` automatically
   - Ensures consistent code style without manual intervention
 - **Infrastructure**: Simplified npm scripts - moved credential loading into wrapper script
 - **Infrastructure**: Separated infra management (`infra:*`) from app deployment (`deploy`)
+- **Infrastructure**: Added second Lambda function and API route to Terraform configuration
 - **DevOps**: Eliminated all PowerShell dependencies - 100% Node.js tooling for cross-platform support
+- **DevOps**: Root package.json now builds all Lambda functions via `build:lambda` script
 
 ### Removed
 
@@ -106,11 +118,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Deployed Infrastructure
 
 - API endpoint: `https://lrq8kagxo1.execute-api.us-west-2.amazonaws.com`
-- Lambda function: `vwc-getVehicleOverview-dev` (3.87 MB deployment package)
+- Lambda functions:
+  - `vwc-getVehicleOverview-dev` (3.88 MB deployment package)
+  - `vwc-listVehicleEvents-dev` (3.88 MB deployment package)
 - Lambda execution role: `arn:aws:iam::491696534851:role/vwc-lambda-execution-role`
+- API routes:
+  - `GET /vehicles/{vehicleId}/overview` - Vehicle summary with recent events
+  - `GET /vehicles/{vehicleId}/events` - Paginated event list with filtering
 - CloudWatch log groups with 3-day retention for cost optimization
 - MongoDB Atlas IP whitelist configured to allow Lambda connections (0.0.0.0/0)
-- End-to-end validation: API endpoint returning vehicle overview data successfully
+- End-to-end validation: Both API endpoints deployed and tested successfully
 
 ### Technical Notes
 

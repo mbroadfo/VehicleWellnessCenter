@@ -79,6 +79,9 @@ DEVELOPMENT RULES:
 - API Gateway HTTP API v2 logging requires CloudWatch Logs resource policies, not IAM roles like REST APIs.
 - IAM policy `terraform-vwc-core` must be iteratively updated as Terraform reveals missing permissions.
 - CloudWatch log retention should be 3 days for cost optimization in dev environment.
+- Lambda test strategy: Write validation-only tests (input checks, error cases), skip complex MongoDB mocking.
+- Utility scripts (seed, test-connection) must call process.exit(0) after completion to prevent hanging on connection pools.
+- Build scripts should be parameterized to support multiple Lambda functions with a single implementation.
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.
