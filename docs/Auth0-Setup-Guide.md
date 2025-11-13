@@ -3,13 +3,14 @@
 ## Overview
 
 VWC uses Auth0 for JWT authentication. You need to create:
+
 1. Auth0 Tenant (free tier available)
 2. Auth0 API for VWC
 3. Auth0 Application for testing/frontend
 
 ## Step 1: Create Auth0 Tenant
 
-1. Go to https://auth0.com/ and sign up (free tier)
+1. Go to <https://auth0.com/> and sign up (free tier)
 2. Create a new tenant: `vwc-YOUR-NAME` (e.g., `vwc-dev`)
 3. Choose region closest to your AWS region (us-west-2 → US)
 4. Note your tenant domain: `vwc-YOUR-NAME.auth0.com`
@@ -26,24 +27,49 @@ VWC uses Auth0 for JWT authentication. You need to create:
 6. Click "Create"
 
 **Important Settings:**
+
 - Enable RBAC (Role-Based Access Control) if you need permissions
 - Set Token Expiration as needed (default: 86400 seconds / 24 hours)
 
-## Step 3: Create Auth0 Application (for testing)
+## Step 3a: Create M2M Application (for automated testing & admin)
+
+1. In Auth0 Dashboard → Applications → Applications
+2. Click "Create Application"
+3. **Name**: Vehicle Wellness Center M2M
+4. **Type**: Machine to Machine Applications
+5. Select the API: **Vehicle Wellness Center API**
+6. Click "Authorize"
+7. Select permissions if needed (none required for basic CRUD)
+8. Click "Authorize"
+
+**Note your M2M credentials:**
+
+- Client ID: Save to AWS Secrets Manager as `AUTH0_M2M_CLIENT_ID`
+- Client Secret: Save to AWS Secrets Manager as `AUTH0_M2M_CLIENT_SECRET`
+
+**Verify Settings:**
+
+- Application Type: Machine to Machine
+- Grant Types: Client Credentials (should be auto-enabled)
+- APIs tab: Vehicle Wellness Center API should be listed as authorized
+
+## Step 3b: Create SPA Application (for React frontend)
 
 1. In Auth0 Dashboard → Applications → Applications
 2. Click "Create Application"
 3. **Name**: VWC Test Client
-4. **Type**: Single Page Application (for React frontend later)
+4. **Type**: Single Page Application
 5. Click "Create"
 
 **Configure Settings:**
+
 - **Allowed Callback URLs**: `http://localhost:5173` (Vite dev server)
 - **Allowed Logout URLs**: `http://localhost:5173`
 - **Allowed Web Origins**: `http://localhost:5173`
 - **Allowed Origins (CORS)**: `http://localhost:5173`
 
 **Note your credentials:**
+
 - Domain: `vwc-YOUR-NAME.auth0.com`
 - Client ID: `abc123...` (needed for frontend)
 
@@ -63,6 +89,7 @@ npm run infra:apply
 ```
 
 This will:
+
 - Create JWT authorizer with Auth0 issuer
 - Protect all API routes with JWT validation
 - Validate tokens using Auth0's public keys (JWKS)
@@ -127,6 +154,7 @@ Invoke-RestMethod `
 ```
 
 **Expected Results:**
+
 - ✅ With valid token: 200 OK or 404 Not Found (vehicle doesn't exist)
 - ❌ Without token: 401 Unauthorized
 - ❌ With invalid token: 401 Unauthorized
@@ -134,7 +162,7 @@ Invoke-RestMethod `
 
 ## Architecture
 
-```
+```text
 Frontend (React)
     ↓ Login via Auth0
 Auth0 (Identity Provider)
@@ -149,6 +177,7 @@ Lambda Functions
 ```
 
 **Key Points:**
+
 - API Gateway fetches Auth0's public keys automatically (JWKS endpoint)
 - No secrets needed in AWS - validation uses public key cryptography
 - Tokens are signed by Auth0's private key (secure)
@@ -166,7 +195,7 @@ Lambda Functions
    - Terraform: `vwc-api`
    - Token `aud` claim: `["vwc-api"]`
 
-3. **Decode token**: Use https://jwt.io to inspect claims
+3. **Decode token**: Use <https://jwt.io> to inspect claims
    - Verify `iss`, `aud`, `exp` (expiration)
    - Check if token expired
 
@@ -203,4 +232,3 @@ Lambda Functions
 - Set up proper callback URLs for production domain
 - Monitor Auth0 rate limits (free tier: 7,000 active users, 1,000 M2M tokens/month)
 - Consider paid plan for production features (SLA, advanced security, custom domains)
-

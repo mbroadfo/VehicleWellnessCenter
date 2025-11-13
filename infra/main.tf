@@ -669,6 +669,71 @@ resource "aws_lambda_permission" "api_gateway_list_vehicle_events" {
 }
 
 # ============================================================================
+# Lambda Function: recordVehicleEvent
+# ============================================================================
+
+resource "aws_lambda_function" "record_vehicle_event" {
+  filename      = "${path.module}/lambda-recordVehicleEvent.zip"
+  function_name = "vwc-recordVehicleEvent-${var.environment}"
+  role          = aws_iam_role.vwc_lambda_exec.arn
+  handler       = "recordVehicleEvent.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 30
+  memory_size   = 512
+
+  source_code_hash = filebase64sha256("${path.module}/lambda-recordVehicleEvent.zip")
+
+  environment {
+    variables = {
+      AWS_SECRET_ID    = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
+      MONGODB_DATABASE = "vehicle_wellness_center"
+      NODE_ENV         = var.environment
+    }
+  }
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "record_vehicle_event" {
+  name              = "/aws/lambda/${aws_lambda_function.record_vehicle_event.function_name}"
+  retention_in_days = 3
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# Integration for recordVehicleEvent
+resource "aws_apigatewayv2_integration" "record_vehicle_event" {
+  api_id                 = aws_apigatewayv2_api.vwc_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.record_vehicle_event.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "record_vehicle_event" {
+  api_id             = aws_apigatewayv2_api.vwc_api.id
+  route_key          = "POST /vehicles/{vehicleId}/events"
+  target             = "integrations/${aws_apigatewayv2_integration.record_vehicle_event.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+}
+
+resource "aws_lambda_permission" "api_gateway_record_vehicle_event" {
+  statement_id  = "AllowAPIGatewayInvokeRecordEvent"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.record_vehicle_event.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.vwc_api.execution_arn}/*/*"
+}
+
+# ============================================================================
 # Outputs
 # ============================================================================
 

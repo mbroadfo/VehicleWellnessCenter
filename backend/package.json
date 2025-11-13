@@ -9,8 +9,9 @@
     "build:lambda": "node scripts/build-lambda.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "test": "vitest run",
+    "test": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 vitest run",
     "test:watch": "vitest",
+    "test:integration": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 vitest run api-integration.test.ts",
     "test:connection": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/test-connection.ts",
     "init:collections": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/init-collections.ts",
     "seed:test": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/seed-test-data.ts"

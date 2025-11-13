@@ -4,6 +4,80 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - 2025-11-13
+
+### Added - POST Endpoint & Integration Tests
+
+- **Backend**: `recordVehicleEvent` Lambda function (POST `/vehicles/{vehicleId}/events`)
+  - Creates vehicle events with comprehensive validation (vehicleId, required fields, optional numeric types)
+  - Validates ObjectId format, JSON parsing, required fields (type, occurredAt, summary)
+  - Validates optional fields (cost must be positive number, mileage must be positive integer)
+  - Checks vehicle existence before creating event (returns 404 if not found)
+  - Builds event document with nested details/source structure
+  - Returns 201 with eventId on success, appropriate 400/404/500 errors
+  - JWT-protected via Auth0 (401 without valid token)
+- **Tests**: Comprehensive unit tests for `recordVehicleEvent` (9 validation tests)
+  - Tests missing/invalid vehicleId, missing body, invalid JSON
+  - Tests missing required fields (type, occurredAt, summary)
+  - Tests invalid date format, negative cost, non-integer mileage
+  - All validation tests passing
+- **Tests**: Full API integration test suite (`api-integration.test.ts`) with 17 tests
+  - Phase 1: Creates test vehicle and 3 events via POST API
+  - Phase 2: Validates data via GET endpoints (overview, events list)
+  - Phase 3: Updates data and verifies changes
+  - Phase 4: Tests authentication (401), validation errors (400), non-existent vehicles (404)
+  - Phase 5: Cleans up all test data via MongoDB
+  - Self-contained: creates and removes own test data, safe to run repeatedly
+  - Runs in ~3-4 seconds with proper cleanup even on test failures
+  - **Automatic Auth0 token retrieval**: No manual token setup required
+- **Auth0**: M2M (Machine-to-Machine) application integration for automated testing
+  - Client Credentials flow implementation in `lib/auth0.ts`
+  - Token caching with 5-minute expiration buffer (reduces Auth0 API calls)
+  - Tokens cached in Lambda container memory (survives ~15-45 minutes)
+  - Integration tests automatically fetch tokens via M2M credentials from Secrets Manager
+  - Eliminates manual token copying from Auth0 dashboard
+- **Infrastructure**: recordVehicleEvent Lambda, API Gateway POST route, CloudWatch logs
+  - Lambda: 512MB memory, 30s timeout, JWT authentication required
+  - Route: `POST /vehicles/{vehicleId}/events` with authorization_type="JWT"
+  - Package: 3.89 MB deployment artifact
+- **DevOps**: All tests run with AWS credentials automatically (`npm run test`)
+  - Uses `terraform-vwc` AWS profile for MongoDB and Secrets Manager access
+  - No manual AUTH0_TOKEN environment variable needed
+  - Comprehensive README in `backend/tests/README-integration.md`
+- **Documentation**: Parameter Store token caching design document
+  - Job jar entry: `docs/job-jar-parameter-store-token-cache.md`
+  - Future enhancement for shared token cache across Lambda containers
+  - Complete Terraform configuration and implementation plan
+  - Free tier solution using AWS Systems Manager Parameter Store
+- **Utilities**: Updated `seed-test-data.ts` to disable auto-cleanup
+  - Leaves test data in database for manual API testing
+  - Shows both overview and events URLs
+  - Auto-cleanup can be re-enabled by uncommenting cleanup section
+
+### Changed
+
+- All three Lambda functions now deployed and JWT-protected:
+  - `vwc-getVehicleOverview-dev` (GET `/vehicles/{vehicleId}/overview`)
+  - `vwc-listVehicleEvents-dev` (GET `/vehicles/{vehicleId}/events`)
+  - `vwc-recordVehicleEvent-dev` (POST `/vehicles/{vehicleId}/events`)
+- Secrets Manager schema expanded to include Auth0 M2M credentials
+  - Added `AUTH0_M2M_CLIENT_ID` and `AUTH0_M2M_CLIENT_SECRET` fields
+  - `AppSecrets` interface in `lib/mongodb.ts` now exports `getSecrets()` for reuse
+  - Updated `infra/secret-example.json` with M2M credential placeholders
+- Vitest configuration simplified (no test exclusions, all tests run with credentials)
+
+### Testing
+
+- Successfully tested POST endpoint with Auth0 token:
+  - Created event with valid payload (eventId: 6916159d6abd942ccd1ef492)
+  - Verified 404 for non-existent vehicle
+  - Verified 400 for missing required fields
+  - Verified 401 without authentication
+  - Event correctly appears in GET endpoints after creation
+- Integration test suite validates full lifecycle:
+  - Create → Read → Update → Validate → Cleanup
+  - All 17 tests passing consistently
+
 ## [Unreleased] - 2025-01-22
 
 ### Added
@@ -39,9 +113,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - IAM roles for Lambda execution (cloud native, no access keys in production)
 - JSON schema validators on all collections with "warn" action for flexible development
 
-## [Unreleased] - 2025-11-13
+## [Unreleased] - 2025-01-22 (continued)
 
-### Added - JWT Authentication
+### Added - JWT Authentication (Earlier Session)
 
 - **Security**: Auth0 JWT authentication for API Gateway
   - JWT authorizer validates RS256 tokens from Auth0 tenant
@@ -125,7 +199,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - CloudWatch Logs management (log groups, retention, delivery, resource policies)
   - Secrets Manager read access
 
-### Changed
+### Changed - Backend & Infrastructure
 
 - **Backend**: ESLint configuration updated to disable unsafe type rules for test files
 - **Backend**: Seed script improvements

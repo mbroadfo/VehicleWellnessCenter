@@ -4,19 +4,23 @@ import {
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
 
-interface MongoDBCredentials {
+interface AppSecrets {
   MONGODB_ATLAS_HOST: string;
   MONGODB_ATLAS_USERNAME: string;
   MONGODB_ATLAS_PASSWORD: string;
+  AUTH0_DOMAIN: string;
+  AUTH0_AUDIENCE: string;
+  AUTH0_M2M_CLIENT_ID: string;
+  AUTH0_M2M_CLIENT_SECRET: string;
 }
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 
 /**
- * Get MongoDB credentials from AWS Secrets Manager
+ * Get all application secrets from AWS Secrets Manager
  */
-async function getCredentials(): Promise<MongoDBCredentials> {
+export async function getSecrets(): Promise<AppSecrets> {
   // AWS_REGION is automatically set by Lambda runtime
   const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-west-2";
   const secretId =
@@ -30,17 +34,18 @@ async function getCredentials(): Promise<MongoDBCredentials> {
     throw new Error("Secret value is empty");
   }
 
-  const credentials = JSON.parse(response.SecretString) as MongoDBCredentials;
+  const secrets = JSON.parse(response.SecretString) as AppSecrets;
 
+  // Validate MongoDB credentials
   if (
-    !credentials.MONGODB_ATLAS_HOST ||
-    !credentials.MONGODB_ATLAS_USERNAME ||
-    !credentials.MONGODB_ATLAS_PASSWORD
+    !secrets.MONGODB_ATLAS_HOST ||
+    !secrets.MONGODB_ATLAS_USERNAME ||
+    !secrets.MONGODB_ATLAS_PASSWORD
   ) {
     throw new Error("Missing required MongoDB credentials in secret");
   }
 
-  return credentials;
+  return secrets;
 }
 
 /**
@@ -52,9 +57,9 @@ export async function getDatabase(): Promise<Db> {
     return cachedDb;
   }
 
-  const credentials = await getCredentials();
+  const secrets = await getSecrets();
   const { MONGODB_ATLAS_HOST, MONGODB_ATLAS_USERNAME, MONGODB_ATLAS_PASSWORD } =
-    credentials;
+    secrets;
 
   const uri = `mongodb+srv://${encodeURIComponent(MONGODB_ATLAS_USERNAME)}:${encodeURIComponent(MONGODB_ATLAS_PASSWORD)}@${MONGODB_ATLAS_HOST}/?retryWrites=true&w=majority&appName=VehicleWellnessCenter`;
 

@@ -154,10 +154,14 @@ async function seedTestData() {
   console.log(`VIN: ${vehicle.vin}`);
   console.log(`Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}`);
   console.log(`Events: ${events.length} maintenance records`);
-  console.log(`\n🔗 Test URL:`);
-  console.log(`https://lrq8kagxo1.execute-api.us-west-2.amazonaws.com/vehicles/${vehicle._id.toString()}/overview`);
+  console.log(`\n🔗 Test URLs:`);
+  console.log(`Overview: https://lrq8kagxo1.execute-api.us-west-2.amazonaws.com/vehicles/${vehicle._id.toString()}/overview`);
+  console.log(`Events: https://lrq8kagxo1.execute-api.us-west-2.amazonaws.com/vehicles/${vehicle._id.toString()}/events`);
+  console.log(`\n✅ Test data created successfully! (Not auto-cleaned)`);
+  process.exit(0);
 
-  // Auto-cleanup after brief pause
+  // Auto-cleanup disabled - uncomment below to enable
+  /*
   console.log('\n⏳ Waiting 3 seconds before cleanup...');
   await new Promise(resolve => setTimeout(resolve, 3000));
 
@@ -175,6 +179,7 @@ async function seedTestData() {
     console.error('❌ Error during cleanup:', error);
     process.exit(1);
   }
+  */
 }
 
 seedTestData().catch((error) => {

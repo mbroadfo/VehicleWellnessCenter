@@ -22,6 +22,8 @@ aws secretsmanager get-secret-value `
 # Edit temp-secret.json and add:
 # "AUTH0_DOMAIN": "vwc-YOUR-TENANT.auth0.com",
 # "AUTH0_AUDIENCE": "vwc-api",
+# "AUTH0_M2M_CLIENT_ID": "your-m2m-client-id",
+# "AUTH0_M2M_CLIENT_SECRET": "your-m2m-client-secret",
 
 # Update secret
 aws secretsmanager update-secret `
@@ -34,7 +36,7 @@ aws secretsmanager update-secret `
 Remove-Item temp-secret.json
 ```
 
-3. **Deploy infrastructure**
+1. **Deploy infrastructure**
 
 ```powershell
 npm run infra:apply
@@ -49,14 +51,16 @@ Add these two fields to your existing secret JSON:
   "MONGODB_ATLAS_PUBLIC_KEY": "...",
   "MONGODB_ATLAS_PRIVATE_KEY": "...",
   "AUTH0_DOMAIN": "vwc-YOUR-TENANT.auth0.com",
-  "AUTH0_AUDIENCE": "vwc-api"
+  "AUTH0_AUDIENCE": "vwc-api",
+  "AUTH0_M2M_CLIENT_ID": "your-m2m-client-id",
+  "AUTH0_M2M_CLIENT_SECRET": "your-m2m-client-secret"
 }
 ```
 
 **Important:**
+
 - `AUTH0_DOMAIN`: Just the domain, no `https://` or trailing slash
   - ✅ Correct: `vwc-dev.auth0.com`
   - ❌ Wrong: `https://vwc-dev.auth0.com/`
 - `AUTH0_AUDIENCE`: Must match exactly what you set in Auth0 API configuration
   - Example: `vwc-api` or `https://api.vehiclewellnesscenter.com`
-
