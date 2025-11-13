@@ -36,6 +36,8 @@ const tfVars = {
   TF_VAR_mongodb_atlas_private_key: secretJson.MONGODB_ATLAS_PRIVATE_KEY,
   TF_VAR_mongodb_atlas_org_id: secretJson.MONGODB_ATLAS_ORG_ID,
   TF_VAR_mongodb_atlas_project_id: secretJson.MONGODB_ATLAS_PROJECT_ID,
+  TF_VAR_auth0_domain: secretJson.AUTH0_DOMAIN,
+  TF_VAR_auth0_audience: secretJson.AUTH0_AUDIENCE,
 };
 
 // Get Secret ARN

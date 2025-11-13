@@ -39,6 +39,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - IAM roles for Lambda execution (cloud native, no access keys in production)
 - JSON schema validators on all collections with "warn" action for flexible development
 
+## [Unreleased] - 2025-11-13
+
+### Added - JWT Authentication
+
+- **Security**: Auth0 JWT authentication for API Gateway
+  - JWT authorizer validates RS256 tokens from Auth0 tenant
+  - Issuer: Auth0 tenant domain (configured via AWS Secrets Manager)
+  - Audience: `https://vehiclewellnesscenter/api`
+  - Automatic public key validation via JWKS endpoint
+- **Infrastructure**: Auth0 configuration variables (`auth0_domain`, `auth0_audience`)
+  - Loaded from AWS Secrets Manager secret `vehical-wellness-center-dev`
+  - Updated `load-tf-env.js` to inject Auth0 variables into Terraform
+- **Documentation**: Complete Auth0 setup guide (`docs/Auth0-Setup-Guide.md`)
+  - Tenant creation, API configuration, token generation instructions
+  - Testing examples for PowerShell, curl, JavaScript
+  - Troubleshooting guide for common auth issues
+- **Documentation**: Quick reference for AWS secret updates (`docs/auth0-secrets-todo.md`)
+- **Infrastructure**: Terraform variables template (`infra/terraform.tfvars.example`)
+
+### Changed - API Security
+
+- **API Gateway**: All routes now require JWT authorization
+  - `GET /vehicles/{vehicleId}/overview` - protected
+  - `GET /vehicles/{vehicleId}/events` - protected
+  - Unauthorized requests return 401 with `{"message":"Unauthorized"}`
+- **Security**: Removed custom JWT generation script (not needed with Auth0)
+
+### Infrastructure Updates
+
+- AWS API Gateway HTTP API v2 JWT authorizer created
+- Both Lambda routes updated with `authorization_type = "JWT"`
+- CloudWatch API Gateway logs show authorization status (401 vs 404/200)
+
 ## [Unreleased] - 2025-11-12
 
 ### Added - Lambda & API Gateway

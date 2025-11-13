@@ -82,6 +82,9 @@ DEVELOPMENT RULES:
 - Lambda test strategy: Write validation-only tests (input checks, error cases), skip complex MongoDB mocking.
 - Utility scripts (seed, test-connection) must call process.exit(0) after completion to prevent hanging on connection pools.
 - Build scripts should be parameterized to support multiple Lambda functions with a single implementation.
+- JWT authentication uses Auth0 with RS256 (RSA public key). Each project has its own Auth0 tenant and API.
+- Auth0 configuration requires two variables: auth0_domain (tenant.auth0.com) and auth0_audience (API identifier).
+- Never create secrets in AWS - only document what secrets the user needs to create.
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.

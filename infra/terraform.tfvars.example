@@ -1,0 +1,27 @@
+# Example Terraform Variables for Vehicle Wellness Center
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control
+
+# AWS Configuration
+aws_region  = "us-west-2"
+environment = "dev"
+
+# MongoDB Atlas Configuration
+mongodb_atlas_project_id = "YOUR_ATLAS_PROJECT_ID"
+mongodb_atlas_region     = "US_WEST_2" # Must map to AWS us-west-2
+mongodb_database_name    = "vehicle_wellness_center"
+
+# MongoDB Atlas Credentials Secret
+mongodb_database_user_secret_id = "vwc/mongodb-user"
+
+# Auth0 Configuration
+# Create an Auth0 tenant and API at https://manage.auth0.com/
+auth0_domain   = "your-vwc-tenant.auth0.com"  # Your Auth0 tenant domain
+auth0_audience = "vwc-api"                    # Or https://api.vehiclewellnesscenter.com
+
+# MongoDB Atlas API Keys
+# Set these via environment variables instead:
+# export TF_VAR_mongodb_atlas_public_key="your_public_key"
+# export TF_VAR_mongodb_atlas_private_key="your_private_key"
+# mongodb_atlas_public_key  = ""
+# mongodb_atlas_private_key = ""

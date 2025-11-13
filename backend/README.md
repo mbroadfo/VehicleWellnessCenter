@@ -30,7 +30,7 @@ npm run typecheck:backend  # Type check with TypeScript compiler
 
 ## Lambda Functions
 
-Lambda functions use IAM role-based authentication and retrieve MongoDB credentials from AWS Secrets Manager at runtime.
+Lambda functions use IAM role-based authentication and retrieve MongoDB credentials from AWS Secrets Manager at runtime. All API endpoints are protected with Auth0 JWT authentication - valid tokens required in `Authorization: Bearer <token>` header.
 
 ### Implemented Functions
 

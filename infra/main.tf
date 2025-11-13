@@ -75,6 +75,16 @@ variable "mongodb_database_name" {
   default     = "vehicle_wellness_center"
 }
 
+variable "auth0_domain" {
+  description = "Auth0 tenant domain (e.g., your-tenant.auth0.com)"
+  type        = string
+}
+
+variable "auth0_audience" {
+  description = "Auth0 API audience identifier (e.g., vwc-api or https://api.vehiclewellnesscenter.com)"
+  type        = string
+}
+
 variable "mongodb_database_user_secret_id" {
   description = "Secrets Manager identifier (ID or ARN) whose JSON payload supplies MongoDB username and password."
   type        = string
@@ -503,6 +513,19 @@ resource "aws_apigatewayv2_api" "vwc_api" {
   }
 }
 
+# JWT Authorizer for API Gateway (Auth0)
+resource "aws_apigatewayv2_authorizer" "jwt" {
+  api_id           = aws_apigatewayv2_api.vwc_api.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "vwc-jwt-authorizer-${var.environment}"
+
+  jwt_configuration {
+    audience = [var.auth0_audience]
+    issuer   = "https://${var.auth0_domain}/"
+  }
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.vwc_api.id
   name        = "$default"
@@ -565,9 +588,11 @@ resource "aws_apigatewayv2_integration" "get_vehicle_overview" {
 }
 
 resource "aws_apigatewayv2_route" "get_vehicle_overview" {
-  api_id    = aws_apigatewayv2_api.vwc_api.id
-  route_key = "GET /vehicles/{vehicleId}/overview"
-  target    = "integrations/${aws_apigatewayv2_integration.get_vehicle_overview.id}"
+  api_id             = aws_apigatewayv2_api.vwc_api.id
+  route_key          = "GET /vehicles/{vehicleId}/overview"
+  target             = "integrations/${aws_apigatewayv2_integration.get_vehicle_overview.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
 resource "aws_lambda_permission" "api_gateway_get_vehicle_overview" {
@@ -628,9 +653,11 @@ resource "aws_apigatewayv2_integration" "list_vehicle_events" {
 }
 
 resource "aws_apigatewayv2_route" "list_vehicle_events" {
-  api_id    = aws_apigatewayv2_api.vwc_api.id
-  route_key = "GET /vehicles/{vehicleId}/events"
-  target    = "integrations/${aws_apigatewayv2_integration.list_vehicle_events.id}"
+  api_id             = aws_apigatewayv2_api.vwc_api.id
+  route_key          = "GET /vehicles/{vehicleId}/events"
+  target             = "integrations/${aws_apigatewayv2_integration.list_vehicle_events.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
 resource "aws_lambda_permission" "api_gateway_list_vehicle_events" {
