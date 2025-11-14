@@ -3,6 +3,7 @@ import {
   SecretsManagerClient,
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
+import { getSecretsFromParameterStore } from './parameterStore';
 
 interface AppSecrets {
   MONGODB_ATLAS_HOST: string;
@@ -12,19 +13,35 @@ interface AppSecrets {
   AUTH0_AUDIENCE: string;
   AUTH0_M2M_CLIENT_ID: string;
   AUTH0_M2M_CLIENT_SECRET: string;
+  GOOGLE_GEMINI_API_KEY?: string;
 }
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 
 /**
- * Get all application secrets from AWS Secrets Manager
+ * Get all application secrets from Parameter Store or Secrets Manager
+ * 
+ * Uses SSM_SECRETS_PARAMETER_NAME environment variable to determine source:
+ * - If set: Use Parameter Store (new)
+ * - If unset: Use Secrets Manager (legacy)
  */
 export async function getSecrets(): Promise<AppSecrets> {
-  // AWS_REGION is automatically set by Lambda runtime
+  const useParameterStore = process.env.SSM_SECRETS_PARAMETER_NAME;
+  
+  if (useParameterStore) {
+    // Parameter Store (new method)
+    console.log('🔍 Reading secrets from Parameter Store...');
+    const secrets = await getSecretsFromParameterStore();
+    console.log('✅ Successfully loaded secrets from Parameter Store');
+    return secrets;
+  }
+
+  // Secrets Manager (legacy method)
+  console.log('🔍 Reading secrets from Secrets Manager...');
+  
   const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-west-2";
-  const secretId =
-    process.env.AWS_SECRET_ID || "vehical-wellness-center-dev";
+  const secretId = process.env.AWS_SECRET_ID || "vehical-wellness-center-dev";
 
   const client = new SecretsManagerClient({ region });
   const command = new GetSecretValueCommand({ SecretId: secretId });
@@ -45,6 +62,7 @@ export async function getSecrets(): Promise<AppSecrets> {
     throw new Error("Missing required MongoDB credentials in secret");
   }
 
+  console.log('✅ Successfully loaded secrets from Secrets Manager');
   return secrets;
 }
 
