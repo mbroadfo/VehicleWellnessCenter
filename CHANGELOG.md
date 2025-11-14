@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - 2025-11-14
 
+### Removed - Secrets Manager (Phase 6 Complete)
+
+- **Backend**: Removed AWS Secrets Manager code from `mongodb.ts`
+  - Simplified `getSecrets()` to single line calling Parameter Store
+  - Removed imports: `SecretsManagerClient`, `GetSecretValueCommand`
+  - Removed ~45 lines of legacy Secrets Manager retrieval code
+  - Clean codebase - no dead code, no fallback complexity
+- **Infrastructure**: Removed Secrets Manager from Terraform configuration
+  - Removed data source: `aws_secretsmanager_secret_version.mongodb_database_user`
+  - Removed variable: `mongodb_database_user_secret_id`
+  - Updated Lambda IAM policy: removed `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret` permissions
+  - Removed Lambda environment variable: `AWS_SECRET_ID`
+  - MongoDB user resource removed from Terraform (now managed manually in Atlas UI to prevent accidental deletion)
+- **Infrastructure**: Fixed Terraform placeholder bug
+  - Corrected `MONGODB_URI` → `MONGODB_ATLAS_HOST` in Parameter Store template
+  - Ensures consistency between Terraform and actual Parameter Store structure
+- **Cost Savings**: $4.80/year savings now fully realized
+  - Secrets Manager completely removed from infrastructure
+  - Parameter Store Standard tier (free) handling all application secrets
+  - Migration from $0.40/month to $0.00/month for secret storage
+
+### Fixed - MongoDB User Management
+
+- **Database**: MongoDB user `vwc_admin_db_user` recreated manually after Terraform deletion
+  - Role: `readWriteAnyDatabase@admin` (upgraded from scoped readWrite)
+  - Managed in Atlas UI to prevent future accidental deletions during Terraform operations
+  - Credentials match Parameter Store values exactly
+  - All 35 tests passing with new user configuration
+
+### Changed - Migration Status (Phase 6 → Phase 7)
+
+- **Phase 6 Complete**: Secrets Manager fully removed from code and infrastructure
+  - Lambda using Parameter Store exclusively (`SSM_SECRETS_PARAMETER_NAME` set)
+  - All tests passing (35/35: 18 unit + 17 integration)
+  - Code simplified, infrastructure cleaner, costs reduced
+- **Next Phase**: Phase 7 will delete Secrets Manager secret with 7-day recovery window
+- **Documentation**: Phase 6 completion notes added to migration plan
+
 ### Added - Secrets Manager to Parameter Store Migration Plan
 
 - **Documentation**: Comprehensive 8-phase migration plan to replace AWS Secrets Manager with AWS Systems Manager Parameter Store for application secrets

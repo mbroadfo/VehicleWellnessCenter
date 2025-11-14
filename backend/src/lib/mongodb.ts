@@ -1,69 +1,14 @@
 import { MongoClient, Db } from "mongodb";
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from "@aws-sdk/client-secrets-manager";
-import { getSecretsFromParameterStore } from './parameterStore';
-
-interface AppSecrets {
-  MONGODB_ATLAS_HOST: string;
-  MONGODB_ATLAS_USERNAME: string;
-  MONGODB_ATLAS_PASSWORD: string;
-  AUTH0_DOMAIN: string;
-  AUTH0_AUDIENCE: string;
-  AUTH0_M2M_CLIENT_ID: string;
-  AUTH0_M2M_CLIENT_SECRET: string;
-  GOOGLE_GEMINI_API_KEY?: string;
-}
+import { getSecretsFromParameterStore, type AppSecrets } from './parameterStore';
 
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 
 /**
- * Get all application secrets from Parameter Store or Secrets Manager
- * 
- * Uses SSM_SECRETS_PARAMETER_NAME environment variable to determine source:
- * - If set: Use Parameter Store (new)
- * - If unset: Use Secrets Manager (legacy)
+ * Get all application secrets from Parameter Store
  */
 export async function getSecrets(): Promise<AppSecrets> {
-  const useParameterStore = process.env.SSM_SECRETS_PARAMETER_NAME;
-  
-  if (useParameterStore) {
-    // Parameter Store (new method)
-    console.log('🔍 Reading secrets from Parameter Store...');
-    const secrets = await getSecretsFromParameterStore();
-    console.log('✅ Successfully loaded secrets from Parameter Store');
-    return secrets;
-  }
-
-  // Secrets Manager (legacy method)
-  console.log('🔍 Reading secrets from Secrets Manager...');
-  
-  const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-west-2";
-  const secretId = process.env.AWS_SECRET_ID || "vehical-wellness-center-dev";
-
-  const client = new SecretsManagerClient({ region });
-  const command = new GetSecretValueCommand({ SecretId: secretId });
-  const response = await client.send(command);
-
-  if (!response.SecretString) {
-    throw new Error("Secret value is empty");
-  }
-
-  const secrets = JSON.parse(response.SecretString) as AppSecrets;
-
-  // Validate MongoDB credentials
-  if (
-    !secrets.MONGODB_ATLAS_HOST ||
-    !secrets.MONGODB_ATLAS_USERNAME ||
-    !secrets.MONGODB_ATLAS_PASSWORD
-  ) {
-    throw new Error("Missing required MongoDB credentials in secret");
-  }
-
-  console.log('✅ Successfully loaded secrets from Secrets Manager');
-  return secrets;
+  return await getSecretsFromParameterStore();
 }
 
 /**

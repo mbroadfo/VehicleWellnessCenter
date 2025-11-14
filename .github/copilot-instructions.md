@@ -85,14 +85,16 @@ DEVELOPMENT RULES:
 - JWT authentication uses Auth0 with RS256 (RSA public key). Each project has its own Auth0 tenant and API.
 - Auth0 configuration requires two variables: auth0_domain (tenant.auth0.com) and auth0_audience (API identifier).
 - Auth0 M2M applications enable automated token retrieval via Client Credentials flow.
-- Auth0 M2M credentials (client_id, client_secret) stored in AWS Secrets Manager (migrating to Parameter Store), not environment variables.
-- Application secrets migration: Parallel operation using SSM_SECRETS_PARAMETER_NAME environment variable to switch between Secrets Manager (legacy) and Parameter Store (target).
+- Auth0 M2M credentials (client_id, client_secret) stored in Parameter Store, not environment variables.
+- Application secrets: AWS Systems Manager Parameter Store at /vwc/dev/secrets stores all credentials (MongoDB, Auth0, Gemini).
+- Secrets Manager fully removed (Phase 6 complete) - cost savings: $4.80/year realized.
 - Token caching pattern: Two-tier system (memory + Parameter Store) with 5-minute expiration buffer.
 - Lambda token caching: Memory cache (container-specific, 0-1ms) + Parameter Store (shared, 50-100ms).
 - Parameter Store token format: "token|expiresAt" pipe-delimited string at /vwc/dev/auth0-token-cache.
 - Token cache reduces Auth0 API calls by 70-90% and improves Lambda cold start performance.
 - Integration tests automatically fetch Auth0 tokens - no manual AUTH0_TOKEN environment variable needed.
 - Never create secrets in AWS - only document what secrets the user needs to create.
+- MongoDB Atlas users should be managed manually in Atlas UI to prevent accidental deletion during Terraform operations.
 - Single Lambda architecture: Router pattern in index.ts dispatches to routes/ directory based on method + path regex.
 - All Lambda handlers use APIGatewayProxyEventV2 for consistency with HTTP API v2.
 - Route handlers live in src/routes/ directory with imports from ../lib/ (not ./lib/).

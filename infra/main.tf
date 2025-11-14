@@ -85,24 +85,7 @@ variable "auth0_audience" {
   type        = string
 }
 
-variable "mongodb_database_user_secret_id" {
-  description = "Secrets Manager identifier (ID or ARN) whose JSON payload supplies MongoDB username and password."
-  type        = string
-}
-
-data "aws_secretsmanager_secret_version" "mongodb_database_user" {
-  secret_id = var.mongodb_database_user_secret_id
-}
-
 locals {
-  mongodb_app_credentials = try(
-    jsondecode(nonsensitive(data.aws_secretsmanager_secret_version.mongodb_database_user.secret_string)),
-    null
-  )
-
-  mongodb_app_username = try(local.mongodb_app_credentials.MONGODB_ATLAS_USERNAME, null)
-  mongodb_app_password = try(local.mongodb_app_credentials.MONGODB_ATLAS_PASSWORD, null)
-
   vehicles_collection = {
     name = "vehicles"
     options = {
@@ -362,22 +345,11 @@ resource "mongodbatlas_cluster" "vehicle" {
   auto_scaling_disk_gb_enabled = false
 }
 
-resource "mongodbatlas_database_user" "vehicle_app" {
-  username           = local.mongodb_app_username
-  password           = local.mongodb_app_password
-  project_id         = var.mongodb_atlas_project_id
-  auth_database_name = "admin"
-
-  roles {
-    role_name     = "readWrite"
-    database_name = var.mongodb_database_name
-  }
-
-  scopes {
-    name = mongodbatlas_cluster.vehicle.name
-    type = "CLUSTER"
-  }
-}
+# MongoDB database user is managed manually via Atlas UI
+# User: vwc_admin_db_user
+# Role: readWriteAnyDatabase@admin
+# Credentials stored in Parameter Store: /vwc/dev/secrets
+# Note: Previously managed by Terraform, now manual to avoid accidental deletion
 
 output "mongodb_connection_strings" {
   description = "MongoDB SRV connection strings for the Vehicle Wellness Center cluster."
@@ -427,14 +399,6 @@ resource "aws_iam_role_policy" "vwc_lambda_secrets" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
-        ]
-        Resource = data.aws_secretsmanager_secret_version.mongodb_database_user.arn
-      },
       {
         Effect = "Allow"
         Action = [
@@ -500,7 +464,7 @@ resource "aws_ssm_parameter" "application_secrets" {
   description = "Application secrets for Vehicle Wellness Center (MongoDB, Auth0, Gemini)"
   type        = "SecureString" # Encrypted at rest with AWS KMS
   value = jsonencode({
-    MONGODB_URI             = "not-initialized"
+    MONGODB_ATLAS_HOST      = "not-initialized"
     MONGODB_ATLAS_USERNAME  = "not-initialized"
     MONGODB_ATLAS_PASSWORD  = "not-initialized"
     AUTH0_DOMAIN            = "not-initialized"
@@ -552,7 +516,6 @@ resource "aws_lambda_function" "vwc" {
 
   environment {
     variables = {
-      AWS_SECRET_ID              = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
       SSM_SECRETS_PARAMETER_NAME = aws_ssm_parameter.application_secrets.name
       MONGODB_DATABASE           = var.mongodb_database_name
       LAMBDA_APP_URL             = aws_apigatewayv2_api.vwc_api.api_endpoint

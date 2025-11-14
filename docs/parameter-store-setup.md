@@ -150,7 +150,7 @@ Verify Lambda functions work correctly with Parameter Store before removing Secr
 
 ### Parameter Not Found
 
-```
+``` text
 Error: Parameter /vwc/dev/secrets not found
 ```
 
