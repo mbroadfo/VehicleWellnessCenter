@@ -442,6 +442,11 @@ resource "aws_iam_role_policy" "vwc_lambda_secrets" {
           "ssm:PutParameter"
         ]
         Resource = aws_ssm_parameter.auth0_token_cache.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "ssm:GetParameter" # Read-only for application secrets
+        Resource = aws_ssm_parameter.application_secrets.arn
       }
     ]
   })
@@ -483,6 +488,42 @@ resource "aws_ssm_parameter" "auth0_token_cache" {
 }
 
 # ============================================================================
+# Parameter Store - Application Secrets
+# ============================================================================
+# Stores all application secrets (MongoDB, Auth0, Gemini) in a single
+# SecureString parameter. Replaces AWS Secrets Manager for cost optimization.
+# Cost: FREE (Standard tier, <4KB) vs $0.40/month ($4.80/year) for Secrets Manager
+# ============================================================================
+
+resource "aws_ssm_parameter" "application_secrets" {
+  name        = "/vwc/${var.environment}/secrets"
+  description = "Application secrets for Vehicle Wellness Center (MongoDB, Auth0, Gemini)"
+  type        = "SecureString" # Encrypted at rest with AWS KMS
+  value = jsonencode({
+    MONGODB_URI             = "not-initialized"
+    MONGODB_ATLAS_USERNAME  = "not-initialized"
+    MONGODB_ATLAS_PASSWORD  = "not-initialized"
+    AUTH0_DOMAIN            = "not-initialized"
+    AUTH0_AUDIENCE          = "not-initialized"
+    AUTH0_M2M_CLIENT_ID     = "not-initialized"
+    AUTH0_M2M_CLIENT_SECRET = "not-initialized"
+    GOOGLE_GEMINI_API_KEY   = "not-initialized"
+  })
+  tier = "Standard" # Free tier
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    Purpose     = "Application secrets - replacing Secrets Manager for cost optimization"
+  }
+
+  lifecycle {
+    ignore_changes = [value, description] # User manages values manually
+  }
+}
+
+# ============================================================================
 # Unified Lambda Function
 # ============================================================================
 # Single Lambda with router handles all endpoints:
@@ -512,6 +553,7 @@ resource "aws_lambda_function" "vwc" {
   environment {
     variables = {
       AWS_SECRET_ID              = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
+      SSM_SECRETS_PARAMETER_NAME = aws_ssm_parameter.application_secrets.name
       MONGODB_DATABASE           = var.mongodb_database_name
       LAMBDA_APP_URL             = aws_apigatewayv2_api.vwc_api.api_endpoint
       NODE_ENV                   = var.environment

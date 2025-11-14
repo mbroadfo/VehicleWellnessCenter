@@ -85,7 +85,8 @@ DEVELOPMENT RULES:
 - JWT authentication uses Auth0 with RS256 (RSA public key). Each project has its own Auth0 tenant and API.
 - Auth0 configuration requires two variables: auth0_domain (tenant.auth0.com) and auth0_audience (API identifier).
 - Auth0 M2M applications enable automated token retrieval via Client Credentials flow.
-- Auth0 M2M credentials (client_id, client_secret) stored in AWS Secrets Manager, not environment variables.
+- Auth0 M2M credentials (client_id, client_secret) stored in AWS Secrets Manager (migrating to Parameter Store), not environment variables.
+- Application secrets migration: Parallel operation using SSM_SECRETS_PARAMETER_NAME environment variable to switch between Secrets Manager (legacy) and Parameter Store (target).
 - Token caching pattern: Two-tier system (memory + Parameter Store) with 5-minute expiration buffer.
 - Lambda token caching: Memory cache (container-specific, 0-1ms) + Parameter Store (shared, 50-100ms).
 - Parameter Store token format: "token|expiresAt" pipe-delimited string at /vwc/dev/auth0-token-cache.
