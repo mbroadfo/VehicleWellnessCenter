@@ -28,7 +28,7 @@ export default [
     }
   },
   {
-    files: ["src/test-connection.ts", "src/init-collections.ts", "src/lib/mongodb.ts", "src/getVehicleOverview.ts", "src/**/*.test.ts"],
+    files: ["src/test-connection.ts", "src/init-collections.ts", "src/lib/mongodb.ts", "src/routes/**/*.ts", "src/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",

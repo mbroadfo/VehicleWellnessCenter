@@ -4,19 +4,19 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { APIGatewayProxyEvent } from 'aws-lambda';
-import { handler } from './listVehicleEvents';
+import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import { handler } from './routes/listVehicleEvents';
 
 describe('listVehicleEvents - Input Validation', () => {
   it('should return 400 if vehicleId is missing', async () => {
     const event = {
       pathParameters: null,
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const response = await handler(event);
 
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body)).toEqual({
+    expect((response as any).statusCode).toBe(400);
+    expect(JSON.parse((response as any).body)).toEqual({
       error: 'Missing vehicleId parameter',
     });
   });
@@ -25,12 +25,12 @@ describe('listVehicleEvents - Input Validation', () => {
     const event = {
       pathParameters: { vehicleId: 'invalid-id' },
       queryStringParameters: null,
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const response = await handler(event);
 
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body)).toEqual({
+    expect((response as any).statusCode).toBe(400);
+    expect(JSON.parse((response as any).body)).toEqual({
       error: 'Invalid vehicleId format',
     });
   });
@@ -39,12 +39,12 @@ describe('listVehicleEvents - Input Validation', () => {
     const event = {
       pathParameters: { vehicleId: '507f1f77bcf86cd799439011' },
       queryStringParameters: { limit: 'abc' },
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const response = await handler(event);
 
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body)).toEqual({
+    expect((response as any).statusCode).toBe(400);
+    expect(JSON.parse((response as any).body)).toEqual({
       error: 'Invalid limit parameter',
     });
   });
@@ -53,12 +53,12 @@ describe('listVehicleEvents - Input Validation', () => {
     const event = {
       pathParameters: { vehicleId: '507f1f77bcf86cd799439011' },
       queryStringParameters: { offset: '-5' },
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const response = await handler(event);
 
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body)).toEqual({
+    expect((response as any).statusCode).toBe(400);
+    expect(JSON.parse((response as any).body)).toEqual({
       error: 'Invalid offset parameter',
     });
   });

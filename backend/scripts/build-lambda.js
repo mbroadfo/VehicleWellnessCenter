@@ -3,8 +3,8 @@
  * Build Lambda deployment package
  * Pure Node.js implementation - no PowerShell dependency
  * 
- * Usage: node build-lambda.js <functionName>
- * Example: node build-lambda.js getVehicleOverview
+ * Usage: node build-lambda.js
+ * Builds the unified VWC Lambda with all routes
  */
 
 const fs = require('fs');
@@ -12,22 +12,13 @@ const path = require('path');
 const { execSync } = require('child_process');
 const archiver = require('archiver');
 
-// Get function name from command line argument
-const functionName = process.argv[2];
-if (!functionName) {
-  console.error('❌ Error: Function name required');
-  console.error('Usage: node build-lambda.js <functionName>');
-  console.error('Example: node build-lambda.js getVehicleOverview');
-  process.exit(1);
-}
-
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const PACKAGE_DIR = path.join(DIST_DIR, 'lambda-package');
 const INFRA_DIR = path.resolve(ROOT_DIR, '..', 'infra');
-const ZIP_PATH = path.join(INFRA_DIR, `lambda-${functionName}.zip`);
+const ZIP_PATH = path.join(INFRA_DIR, 'lambda-vwc.zip');
 
-console.log(`Building Lambda deployment package for ${functionName}...\n`);
+console.log('Building unified VWC Lambda deployment package...\n');
 
 // Clean previous build
 if (fs.existsSync(DIST_DIR)) {
@@ -85,7 +76,8 @@ archive.on('error', (err) => {
 
 output.on('close', () => {
   const sizeInMB = (archive.pointer() / (1024 * 1024)).toFixed(2);
-  console.log(`\n✅ Lambda package created: ${ZIP_PATH} (${sizeInMB} MB)`);
+  console.log(`\n✅ VWC Lambda package created: ${ZIP_PATH} (${sizeInMB} MB)`);
+  console.log('   Includes: Router + all route handlers (CRUD + AI Chat)');
 });
 
 archive.pipe(output);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { APIGatewayProxyEvent } from "aws-lambda";
-import { handler } from "./getVehicleOverview";
+import { APIGatewayProxyEventV2 } from "aws-lambda";
+import { handler } from "./routes/getVehicleOverview";
 import * as mongodb from "./lib/mongodb";
 
 // Mock the mongodb module
@@ -14,12 +14,12 @@ describe("getVehicleOverview", () => {
   it("returns 400 when vehicleId is missing", async () => {
     const event = {
       pathParameters: null,
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const result = await handler(event);
 
-    expect(result.statusCode).toBe(400);
-    expect(JSON.parse(result.body)).toEqual({
+    expect((result as any).statusCode).toBe(400);
+    expect(JSON.parse((result as any).body)).toEqual({
       error: "vehicleId is required",
     });
   });
@@ -27,12 +27,12 @@ describe("getVehicleOverview", () => {
   it("returns 400 when vehicleId format is invalid", async () => {
     const event = {
       pathParameters: { vehicleId: "invalid-id" },
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const result = await handler(event);
 
-    expect(result.statusCode).toBe(400);
-    expect(JSON.parse(result.body)).toEqual({
+    expect((result as any).statusCode).toBe(400);
+    expect(JSON.parse((result as any).body)).toEqual({
       error: "Invalid vehicleId format",
     });
   });
@@ -48,12 +48,12 @@ describe("getVehicleOverview", () => {
 
     const event = {
       pathParameters: { vehicleId: "507f1f77bcf86cd799439011" },
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const result = await handler(event);
 
-    expect(result.statusCode).toBe(404);
-    expect(JSON.parse(result.body)).toEqual({ error: "Vehicle not found" });
+    expect((result as any).statusCode).toBe(404);
+    expect(JSON.parse((result as any).body)).toEqual({ error: "Vehicle not found" });
   });
 
   it("returns vehicle overview successfully", async () => {
@@ -107,12 +107,12 @@ describe("getVehicleOverview", () => {
 
     const event = {
       pathParameters: { vehicleId: "507f1f77bcf86cd799439011" },
-    } as unknown as APIGatewayProxyEvent;
+    } as unknown as APIGatewayProxyEventV2;
 
     const result = await handler(event);
 
-    expect(result.statusCode).toBe(200);
-    const body = JSON.parse(result.body);
+    expect((result as any).statusCode).toBe(200);
+    const body = JSON.parse((result as any).body);
     expect(body).toEqual({
       vehicleId: "507f1f77bcf86cd799439011",
       vin: "1HGBH41JXMN109186",

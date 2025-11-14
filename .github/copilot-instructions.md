@@ -91,6 +91,13 @@ DEVELOPMENT RULES:
 - For shared token cache, use Parameter Store (future enhancement documented in job jar).
 - Integration tests automatically fetch Auth0 tokens - no manual AUTH0_TOKEN environment variable needed.
 - Never create secrets in AWS - only document what secrets the user needs to create.
+- Single Lambda architecture: Router pattern in index.ts dispatches to routes/ directory based on method + path regex.
+- All Lambda handlers use APIGatewayProxyEventV2 for consistency with HTTP API v2.
+- Route handlers live in src/routes/ directory with imports from ../lib/ (not ./lib/).
+- ESLint config disables unsafe type rules for src/routes/**/*.ts to allow MongoDB document handling.
+- AI orchestrator (Gemini) is core application logic, not just another endpoint - consolidate with CRUD operations.
+- Gemini model: Use gemini-2.5-flash (stable, free tier supported). Experimental models may have quota restrictions.
+- Function calling pattern: AI calls existing HTTP endpoints, not direct database access.
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.

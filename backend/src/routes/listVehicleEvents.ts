@@ -3,9 +3,9 @@
  * Route: GET /vehicles/{vehicleId}/events
  */
 
-import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { ObjectId } from 'mongodb';
-import { getDatabase } from './lib/mongodb';
+import { getDatabase } from '../lib/mongodb';
 
 interface QueryParams {
   limit?: string;
@@ -14,8 +14,8 @@ interface QueryParams {
 }
 
 export async function handler(
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> {
+  event: APIGatewayProxyEventV2
+): Promise<APIGatewayProxyResultV2> {
   try {
     // Extract and validate vehicleId
     const vehicleId = event.pathParameters?.vehicleId;

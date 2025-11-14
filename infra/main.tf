@@ -450,37 +450,53 @@ output "lambda_execution_role_arn" {
 }
 
 # ============================================================================
-# Lambda Functions
+# Unified Lambda Function
+# ============================================================================
+# Single Lambda with router handles all endpoints:
+# - GET /vehicles/{vehicleId}/overview
+# - GET /vehicles/{vehicleId}/events
+# - POST /vehicles/{vehicleId}/events
+# - POST /ai/chat
+#
+# Benefits:
+# - Shared MongoDB connection pool
+# - Single cold start overhead
+# - Simpler infrastructure management
+# - Lower cost
 # ============================================================================
 
-resource "aws_lambda_function" "get_vehicle_overview" {
-  filename      = "${path.module}/lambda-getVehicleOverview.zip"
-  function_name = "vwc-getVehicleOverview-${var.environment}"
+resource "aws_lambda_function" "vwc" {
+  filename      = "${path.module}/lambda-vwc.zip"
+  function_name = "vwc-${var.environment}"
   role          = aws_iam_role.vwc_lambda_exec.arn
-  handler       = "getVehicleOverview.handler"
+  handler       = "index.handler"
   runtime       = "nodejs20.x"
-  timeout       = 30
+  timeout       = 60 # Increased for AI processing + API calls
   memory_size   = 512
 
-  source_code_hash = filebase64sha256("${path.module}/lambda-getVehicleOverview.zip")
+  source_code_hash = filebase64sha256("${path.module}/lambda-vwc.zip")
 
   environment {
     variables = {
       AWS_SECRET_ID    = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
-      MONGODB_DATABASE = "vehicle_wellness_center"
+      MONGODB_DATABASE = var.mongodb_database_name
+      LAMBDA_APP_URL   = aws_apigatewayv2_api.vwc_api.api_endpoint
       NODE_ENV         = var.environment
     }
   }
 
   tags = {
+    Name        = "vwc-unified-${var.environment}"
     Project     = "Vehicle Wellness Center"
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
+
+  depends_on = [aws_cloudwatch_log_group.vwc]
 }
 
-resource "aws_cloudwatch_log_group" "get_vehicle_overview" {
-  name              = "/aws/lambda/${aws_lambda_function.get_vehicle_overview.function_name}"
+resource "aws_cloudwatch_log_group" "vwc" {
+  name              = "/aws/lambda/vwc-${var.environment}"
   retention_in_days = 3
 
   tags = {
@@ -579,158 +595,61 @@ resource "aws_cloudwatch_log_resource_policy" "api_gateway" {
   })
 }
 
-# Integration for getVehicleOverview
-resource "aws_apigatewayv2_integration" "get_vehicle_overview" {
+# ============================================================================
+# API Gateway Integration (Unified)
+# ============================================================================
+# Single integration for all routes - router dispatches internally
+
+resource "aws_apigatewayv2_integration" "vwc" {
   api_id                 = aws_apigatewayv2_api.vwc_api.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.get_vehicle_overview.invoke_arn
+  integration_uri        = aws_lambda_function.vwc.invoke_arn
   payload_format_version = "2.0"
 }
 
-resource "aws_apigatewayv2_route" "get_vehicle_overview" {
-  api_id             = aws_apigatewayv2_api.vwc_api.id
-  route_key          = "GET /vehicles/{vehicleId}/overview"
-  target             = "integrations/${aws_apigatewayv2_integration.get_vehicle_overview.id}"
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
-}
-
-resource "aws_lambda_permission" "api_gateway_get_vehicle_overview" {
-  statement_id  = "AllowAPIGatewayInvoke"
+# Lambda permission for API Gateway
+resource "aws_lambda_permission" "api_gateway_vwc" {
+  statement_id  = "AllowAPIGatewayInvokeVWC"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.get_vehicle_overview.function_name
+  function_name = aws_lambda_function.vwc.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.vwc_api.execution_arn}/*/*"
 }
 
 # ============================================================================
-# Lambda Function: listVehicleEvents
+# API Routes (All point to unified Lambda)
 # ============================================================================
 
-resource "aws_lambda_function" "list_vehicle_events" {
-  filename      = "${path.module}/lambda-listVehicleEvents.zip"
-  function_name = "vwc-listVehicleEvents-${var.environment}"
-  role          = aws_iam_role.vwc_lambda_exec.arn
-  handler       = "listVehicleEvents.handler"
-  runtime       = "nodejs20.x"
-  timeout       = 30
-  memory_size   = 512
-
-  source_code_hash = filebase64sha256("${path.module}/lambda-listVehicleEvents.zip")
-
-  environment {
-    variables = {
-      AWS_SECRET_ID    = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
-      MONGODB_DATABASE = "vehicle_wellness_center"
-      NODE_ENV         = var.environment
-    }
-  }
-
-  tags = {
-    Project     = "Vehicle Wellness Center"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-resource "aws_cloudwatch_log_group" "list_vehicle_events" {
-  name              = "/aws/lambda/${aws_lambda_function.list_vehicle_events.function_name}"
-  retention_in_days = 3
-
-  tags = {
-    Project     = "Vehicle Wellness Center"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# Integration for listVehicleEvents
-resource "aws_apigatewayv2_integration" "list_vehicle_events" {
-  api_id                 = aws_apigatewayv2_api.vwc_api.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.list_vehicle_events.invoke_arn
-  payload_format_version = "2.0"
+resource "aws_apigatewayv2_route" "get_vehicle_overview" {
+  api_id             = aws_apigatewayv2_api.vwc_api.id
+  route_key          = "GET /vehicles/{vehicleId}/overview"
+  target             = "integrations/${aws_apigatewayv2_integration.vwc.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
 resource "aws_apigatewayv2_route" "list_vehicle_events" {
   api_id             = aws_apigatewayv2_api.vwc_api.id
   route_key          = "GET /vehicles/{vehicleId}/events"
-  target             = "integrations/${aws_apigatewayv2_integration.list_vehicle_events.id}"
+  target             = "integrations/${aws_apigatewayv2_integration.vwc.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
-}
-
-resource "aws_lambda_permission" "api_gateway_list_vehicle_events" {
-  statement_id  = "AllowAPIGatewayInvokeListEvents"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.list_vehicle_events.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.vwc_api.execution_arn}/*/*"
-}
-
-# ============================================================================
-# Lambda Function: recordVehicleEvent
-# ============================================================================
-
-resource "aws_lambda_function" "record_vehicle_event" {
-  filename      = "${path.module}/lambda-recordVehicleEvent.zip"
-  function_name = "vwc-recordVehicleEvent-${var.environment}"
-  role          = aws_iam_role.vwc_lambda_exec.arn
-  handler       = "recordVehicleEvent.handler"
-  runtime       = "nodejs20.x"
-  timeout       = 30
-  memory_size   = 512
-
-  source_code_hash = filebase64sha256("${path.module}/lambda-recordVehicleEvent.zip")
-
-  environment {
-    variables = {
-      AWS_SECRET_ID    = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
-      MONGODB_DATABASE = "vehicle_wellness_center"
-      NODE_ENV         = var.environment
-    }
-  }
-
-  tags = {
-    Project     = "Vehicle Wellness Center"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-resource "aws_cloudwatch_log_group" "record_vehicle_event" {
-  name              = "/aws/lambda/${aws_lambda_function.record_vehicle_event.function_name}"
-  retention_in_days = 3
-
-  tags = {
-    Project     = "Vehicle Wellness Center"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# Integration for recordVehicleEvent
-resource "aws_apigatewayv2_integration" "record_vehicle_event" {
-  api_id                 = aws_apigatewayv2_api.vwc_api.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.record_vehicle_event.invoke_arn
-  payload_format_version = "2.0"
 }
 
 resource "aws_apigatewayv2_route" "record_vehicle_event" {
   api_id             = aws_apigatewayv2_api.vwc_api.id
   route_key          = "POST /vehicles/{vehicleId}/events"
-  target             = "integrations/${aws_apigatewayv2_integration.record_vehicle_event.id}"
+  target             = "integrations/${aws_apigatewayv2_integration.vwc.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
-resource "aws_lambda_permission" "api_gateway_record_vehicle_event" {
-  statement_id  = "AllowAPIGatewayInvokeRecordEvent"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.record_vehicle_event.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.vwc_api.execution_arn}/*/*"
+resource "aws_apigatewayv2_route" "ai_chat" {
+  api_id             = aws_apigatewayv2_api.vwc_api.id
+  route_key          = "POST /ai/chat"
+  target             = "integrations/${aws_apigatewayv2_integration.vwc.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
 # ============================================================================
@@ -742,7 +661,12 @@ output "api_gateway_url" {
   value       = aws_apigatewayv2_api.vwc_api.api_endpoint
 }
 
-output "get_vehicle_overview_function_name" {
-  description = "Name of the getVehicleOverview Lambda function"
-  value       = aws_lambda_function.get_vehicle_overview.function_name
+output "lambda_function_name" {
+  description = "Name of the unified VWC Lambda function"
+  value       = aws_lambda_function.vwc.function_name
+}
+
+output "lambda_function_arn" {
+  description = "ARN of the unified VWC Lambda function"
+  value       = aws_lambda_function.vwc.arn
 }

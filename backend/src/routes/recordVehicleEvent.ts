@@ -28,7 +28,7 @@
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { ObjectId } from 'mongodb';
-import { getDatabase } from './lib/mongodb';
+import { getDatabase } from '../lib/mongodb';
 
 interface RecordEventRequest {
   type: string;

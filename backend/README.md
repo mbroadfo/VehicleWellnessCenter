@@ -28,28 +28,39 @@ npm run lint:backend       # Lint with ESLint
 npm run typecheck:backend  # Type check with TypeScript compiler
 ```
 
-## Lambda Functions
+## Lambda Architecture
 
-Lambda functions use IAM role-based authentication and retrieve MongoDB credentials from AWS Secrets Manager at runtime. All API endpoints are protected with Auth0 JWT authentication - valid tokens required in `Authorization: Bearer <token>` header.
+**Single unified Lambda** (`vwc-dev`) with router pattern dispatches requests to route handlers based on HTTP method and path. All routes share the same Lambda container, connection pool, and token cache for optimal performance.
 
-### Implemented Functions
+### Lambda Entry Point
 
-- **getVehicleOverview** (`src/getVehicleOverview.ts`) – Retrieve vehicle details, event count, and recent events
-  - Route: `GET /vehicles/{vehicleId}/overview`
+- **index.ts** (`src/index.ts`) – Main router with regex-based request dispatching
+  - Handles 4 routes through a single Lambda function
+  - Centralized error handling (404 for unknown routes, 500 for crashes)
+  - Uses APIGatewayProxyEventV2 for all routes
+
+### API Routes
+
+All API endpoints are protected with Auth0 JWT authentication - valid tokens required in `Authorization: Bearer <token>` header.
+
+- **GET /vehicles/{vehicleId}/overview** (`src/routes/getVehicleOverview.ts`)
   - Returns: Vehicle details + last 5 events
   - Validates ObjectId format, handles 400/404/500 errors
 
-- **listVehicleEvents** (`src/listVehicleEvents.ts`) – Query vehicle events with pagination and filtering
-  - Route: `GET /vehicles/{vehicleId}/events?limit=10&offset=0&type=oil_change`
+- **GET /vehicles/{vehicleId}/events** (`src/routes/listVehicleEvents.ts`)
   - Query params: `limit` (1-100, default 10), `offset` (default 0), `type` (optional filter)
   - Returns: Paginated events sorted by date (newest first)
   - Includes pagination metadata: totalCount, hasMore, nextOffset
-  - Validates vehicleId and query parameters
 
-### Planned Functions
+- **POST /vehicles/{vehicleId}/events** (`src/routes/recordVehicleEvent.ts`)
+  - Creates new maintenance/incident records
+  - Comprehensive validation (required fields, date format, cost range, ObjectId)
+  - Returns 201 with eventId on success
 
-- **recordVehicleEvent** – Create new maintenance/incident records
-- **chatVehicleHistory** – AI-powered conversational vehicle insights
+- **POST /ai/chat** (`src/routes/aiChat.ts`)
+  - AI Data Curator with Gemini 2.5 Flash model
+  - Function calling: AI calls existing CRUD endpoints via HTTP
+  - Natural language interface for vehicle data queries and updates
 
 ## MongoDB Connection
 

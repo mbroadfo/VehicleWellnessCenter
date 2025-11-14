@@ -1,6 +1,6 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { ObjectId } from "mongodb";
-import { getDatabase } from "./lib/mongodb";
+import { getDatabase } from "../lib/mongodb";
 
 interface VehicleOverview {
   vehicleId: string;
@@ -15,7 +15,7 @@ interface VehicleOverview {
   recentEvents: Array<{
     _id: string;
     type: string;
-    emoji: string;
+    emoji?: string;
     occurredAt: string;
     summary: string;
   }>;
@@ -31,8 +31,8 @@ interface VehicleOverview {
  * GET /vehicles/{vehicleId}/overview
  */
 export async function handler(
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> {
+  event: APIGatewayProxyEventV2
+): Promise<APIGatewayProxyResultV2> {
   try {
     const vehicleId = event.pathParameters?.vehicleId;
 
@@ -86,19 +86,19 @@ export async function handler(
     const overview: VehicleOverview = {
       vehicleId: vehicle._id.toString(),
       vin: vehicle.vin,
-      make: vehicle.attributes?.make,
-      model: vehicle.attributes?.model,
-      year: vehicle.attributes?.year,
-      odometer: vehicle.odometer?.current,
-      acquisitionDate: vehicle.acquisition?.date,
-      estimatedValue: vehicle.valuation?.estimatedValue,
+      make: vehicle.attributes?.make as string | undefined,
+      model: vehicle.attributes?.model as string | undefined,
+      year: vehicle.attributes?.year as number | undefined,
+      odometer: vehicle.odometer?.current as number | undefined,
+      acquisitionDate: vehicle.acquisition?.date as string | undefined,
+      estimatedValue: vehicle.valuation?.estimatedValue as number | undefined,
       eventCount,
       recentEvents: recentEvents.map((event) => ({
         _id: event._id.toString(),
-        type: event.type,
-        emoji: event.emoji,
-        occurredAt: event.occurredAt,
-        summary: event.summary,
+        type: event.type as string,
+        emoji: event.emoji as string | undefined,
+        occurredAt: event.occurredAt as string,
+        summary: event.summary as string,
       })),
       // TODO: Implement upcoming maintenance logic based on forecast field
       upcomingMaintenance: [],

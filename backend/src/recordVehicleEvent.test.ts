@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { handler } from './recordVehicleEvent';
+import { handler } from './routes/recordVehicleEvent';
 
 describe('recordVehicleEvent', () => {
   it('returns 400 when vehicleId is missing', async () => {

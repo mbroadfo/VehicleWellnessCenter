@@ -4,6 +4,71 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - 2025-11-14
+
+### Changed - Single Lambda Architecture
+
+- **Backend**: Consolidated 4 separate Lambda functions into 1 unified Lambda with router pattern
+  - Router in `src/index.ts` dispatches requests based on HTTP method and path regex
+  - All handlers moved to `src/routes/` directory (getVehicleOverview.ts, listVehicleEvents.ts, recordVehicleEvent.ts, aiChat.ts)
+  - Shared connection pool and token cache across all routes (better performance, lower cold start impact)
+  - All handlers now use `APIGatewayProxyEventV2` for consistency
+  - Simplified architecture: 1 Lambda instead of 4 reduces complexity and cost
+- **Infrastructure**: Terraform refactored from 4 Lambda resources to 1
+  - Single Lambda function: `vwc-dev` (Node.js 20.x, 512 MB memory, 60s timeout)
+  - Single API Gateway integration for all 4 routes
+  - All routes (`GET /vehicles/{vehicleId}/overview`, `GET /vehicles/{vehicleId}/events`, `POST /vehicles/{vehicleId}/events`, `POST /ai/chat`) point to same Lambda
+  - Deployment package: `lambda-vwc.zip` (4.03 MB)
+- **AI Integration**: Gemini model updated to `gemini-2.5-flash`
+  - Previous model `gemini-2.0-flash-exp` had free tier quota of 0
+  - Updated based on user's Google AI console showing traffic for gemini-2.5-flash
+  - AI chat endpoint working with function calling (AI successfully calls getVehicleOverview tool)
+  - AI Data Curator pattern validated: AI calls existing CRUD endpoints via HTTP, validates data, provides natural responses
+- **Build System**: Lambda build script simplified for single function
+  - `backend/scripts/build-lambda.js` no longer requires function name parameter
+  - Outputs single `lambda-vwc.zip` with all routes included
+  - Root `package.json` updated with simplified `build:lambda` and `deploy` scripts
+- **DevOps**: Streamlined deployment process
+  - `npm run deploy` builds and updates single Lambda function
+  - Faster deployments (no need to update 4 separate functions)
+  - Simpler infrastructure state (16 resources destroyed, 4 added, 4 updated in consolidation)
+- **Tests**: All test files updated for new architecture
+  - Import paths changed from `./` to `./routes/` for handler functions
+  - All handlers use V2 event types throughout
+  - 35/35 tests passing (18 unit + 17 integration)
+
+### Added - AI Chat Testing
+
+- **Backend**: AI chat test utility (`src/test-ai-chat.ts`)
+  - Validates AI endpoint with realistic queries
+  - Tests function calling (AI calls getVehicleOverview tool)
+  - Tests data validation (AI checks vehicle existence before operations)
+  - Automatic Auth0 token retrieval (no manual setup)
+  - Examples: "Tell me about this vehicle", "Add oil change event"
+
+### Fixed
+
+- **Configuration**: Updated `.gitignore` to properly exclude Terraform numbered backups
+  - Added pattern `infra/terraform.tfstate.*.backup` to catch all backup files
+  - Previously only excluded `terraform.tfstate.backup` (not numbered variants)
+
+### Infrastructure Changes
+
+- Terraform apply results:
+  - Destroyed: 16 resources (4 old Lambdas + 4 old integrations + 4 old routes + 4 old log groups)
+  - Added: 4 resources (1 new Lambda + 1 new integration + 1 new log group + 1 new route)
+  - Changed: 4 resources (3 routes updated to use new integration + 1 JWT authorizer)
+- All 4 API endpoints operational through unified Lambda
+- CloudWatch logs consolidated (single log group instead of 4)
+
+### Architecture Notes
+
+- Single Lambda benefits: Shared connection pool, shared token cache, simpler deployment, lower cost, less infrastructure complexity
+- Router pattern uses regex matching for flexible path dispatching
+- AI orchestrator is core application logic (not just another endpoint) - consolidation reflects this architecture
+- Function calling working correctly: AI calls tools, validates data, handles edge cases naturally
+- Gemini 2.5 Flash model stable and working (confirmed from user's API usage logs)
+
 ## [Unreleased] - 2025-11-13
 
 ### Added - POST Endpoint & Integration Tests
