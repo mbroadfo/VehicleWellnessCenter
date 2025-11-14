@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - 2025-11-14
 
+### Added - Secrets Manager to Parameter Store Migration Plan
+
+- **Documentation**: Comprehensive 8-phase migration plan to replace AWS Secrets Manager with AWS Systems Manager Parameter Store for application secrets
+  - **Cost optimization**: Eliminates $4.80/year Secrets Manager cost (100% savings for Standard tier Parameter Store)
+  - **Security maintained**: Both solutions use KMS encryption (SecureString), IAM resource-level permissions, CloudTrail audit logs, and TLS in transit
+  - **Zero-downtime approach**: Parallel operation with dual-read implementation ensures smooth cutover
+  - **Rollback procedures**: Each phase includes specific rollback steps, 7-day recovery window for deleted secrets
+  - **8 phases planned**: (1) Infrastructure foundation, (2) Dual-read implementation, (3) Manual population, (4) Testing & validation, (5) Documentation updates, (6) Remove Secrets Manager from Terraform, (7) Delete Secrets Manager secret, (8) Final cleanup
+  - **6 milestone commits**: Aligned with phase completion for incremental progress tracking
+  - **Modeled on success**: Based on recently completed Parameter Store token caching optimization (commit 99065c8)
+  - Parameter format: Single JSON parameter `/vwc/dev/secrets` with all 7 credential fields (MongoDB, Auth0, Gemini)
+  - New module specification: `backend/src/lib/parameterStore.ts` with `getSecretsFromParameterStore()`, `clearSecretsCache()` functions
+  - Dual-read pattern: Environment variable `SSM_SECRETS_PARAMETER_NAME` switches between Parameter Store (primary) and Secrets Manager (fallback)
+  - Timeline: 7-10 hours over 2-3 sessions
+  - Documentation file: `docs/job-jar-secrets-to-parameter-store-migration.md`
+
 ### Added - Parameter Store Token Caching
 
 - **Backend**: Two-tier Auth0 token caching system to minimize API calls and improve performance

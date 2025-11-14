@@ -99,6 +99,12 @@ DEVELOPMENT RULES:
 - AI orchestrator (Gemini) is core application logic, not just another endpoint - consolidate with CRUD operations.
 - Gemini model: Use gemini-2.5-flash (stable, free tier supported). Experimental models may have quota restrictions.
 - Function calling pattern: AI calls existing HTTP endpoints, not direct database access.
+- Migration planning pattern: Model new migrations on recent successful implementations (e.g., Parameter Store secrets migration modeled on token cache success).
+- Zero-downtime migrations: Use parallel operation with dual-read/fallback patterns, environment variable switches, incremental commit strategy.
+- Job-jar documents: Store future work items and migration plans in `docs/job-jar-*.md` for tracking technical debt and cost optimizations.
+- Cost optimization opportunities: Continuously evaluate AWS service costs; Parameter Store Standard tier is free, while Secrets Manager costs $0.40/month/secret.
+- Markdown linting fixes: For systematic issues (blank lines, heading spacing), use PowerShell regex scripts or markdownlint-cli2 rather than manual replace_string_in_file calls.
+- Migration commit strategy: Plan 5-6 milestone commits aligned with major phases (infrastructure, code implementation, cutover, documentation, cleanup).
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.
