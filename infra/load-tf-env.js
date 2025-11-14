@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Load AWS credentials and Terraform variables from Secrets Manager
- * Sets environment variables for Terraform operations
+ * Load AWS credentials and Terraform variables from Parameter Store
+ * Sets environment variables for Terraform CLI execution
  */
 
 const { execSync } = require('child_process');
@@ -9,23 +9,23 @@ const { execSync } = require('child_process');
 // AWS Configuration
 process.env.AWS_PROFILE = 'terraform-vwc';
 process.env.AWS_REGION = 'us-west-2';
-process.env.AWS_SECRET_ID = 'vehical-wellness-center-dev';
+process.env.SSM_SECRETS_PARAMETER_NAME = '/vwc/dev/secrets';
 
 console.log('✅ AWS environment configured for Terraform!');
 console.log(`Profile: ${process.env.AWS_PROFILE}`);
 console.log(`Region: ${process.env.AWS_REGION}`);
-console.log(`Secret ID: ${process.env.AWS_SECRET_ID}\n`);
+console.log(`Parameter: ${process.env.SSM_SECRETS_PARAMETER_NAME}\n`);
 
-// Fetch secret from AWS Secrets Manager
+// Fetch secrets from Parameter Store
 let secretJson;
 try {
-  const secretOutput = execSync(
-    `aws secretsmanager get-secret-value --secret-id ${process.env.AWS_SECRET_ID} --region ${process.env.AWS_REGION} --query SecretString --output text`,
+  const parameterOutput = execSync(
+    `aws ssm get-parameter --name ${process.env.SSM_SECRETS_PARAMETER_NAME} --with-decryption --region ${process.env.AWS_REGION} --query Parameter.Value --output text`,
     { encoding: 'utf-8' }
   );
-  secretJson = JSON.parse(secretOutput);
+  secretJson = JSON.parse(parameterOutput);
 } catch (error) {
-  console.error('❌ Failed to retrieve secret from AWS Secrets Manager');
+  console.error('❌ Failed to retrieve secrets from Parameter Store');
   console.error(error.message);
   process.exit(1);
 }
@@ -40,27 +40,12 @@ const tfVars = {
   TF_VAR_auth0_audience: secretJson.AUTH0_AUDIENCE,
 };
 
-// Get Secret ARN
-let secretArn;
-try {
-  secretArn = execSync(
-    `aws secretsmanager describe-secret --secret-id ${process.env.AWS_SECRET_ID} --region ${process.env.AWS_REGION} --query ARN --output text`,
-    { encoding: 'utf-8' }
-  ).trim();
-  tfVars.TF_VAR_mongodb_database_user_secret_id = secretArn;
-} catch (error) {
-  console.error('❌ Failed to get secret ARN');
-  console.error(error.message);
-  process.exit(1);
-}
-
 // Set environment variables
 Object.entries(tfVars).forEach(([key, value]) => {
   process.env[key] = value;
 });
 
-console.log('✅ Terraform variables loaded from AWS Secrets Manager!');
-console.log(`Secret ARN: ${secretArn}`);
+console.log('✅ Terraform variables loaded from Parameter Store!');
 console.log(`MongoDB Atlas Org ID: ${secretJson.MONGODB_ATLAS_ORG_ID}`);
 console.log(`MongoDB Atlas Project ID: ${secretJson.MONGODB_ATLAS_PROJECT_ID}\n`);
 

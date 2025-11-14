@@ -1,47 +1,9 @@
 import { MongoClient } from "mongodb";
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from "@aws-sdk/client-secrets-manager";
-
-interface VWCSecrets {
-  MONGODB_ATLAS_HOST: string;
-  MONGODB_ATLAS_USERNAME: string;
-  MONGODB_ATLAS_PASSWORD: string;
-}
-
-async function getSecretsFromAWS(
-  secretId: string
-): Promise<VWCSecrets> {
-  const region = process.env.AWS_REGION;
-  if (!region) {
-    throw new Error("AWS_REGION environment variable is required");
-  }
-  const client = new SecretsManagerClient({ region });
-  const command = new GetSecretValueCommand({ SecretId: secretId });
-
-  try {
-    const response = await client.send(command);
-    const secretString = response.SecretString;
-    if (!secretString || typeof secretString !== "string") {
-      throw new Error("Secret value is empty or invalid");
-    }
-    return JSON.parse(secretString) as VWCSecrets;
-  } catch (error) {
-    console.error("Failed to retrieve secrets from AWS Secrets Manager:");
-    throw error;
-  }
-}
+import { getSecretsFromParameterStore } from "./lib/parameterStore.js";
 
 async function testConnection(): Promise<void> {
-  // Get secret ID from environment
-  const secretId = process.env.AWS_SECRET_ID;
-  if (!secretId) {
-    throw new Error("AWS_SECRET_ID environment variable is required");
-  }
-  
-  console.log(`Retrieving secrets from AWS Secrets Manager: ${secretId}`);
-  const secrets = await getSecretsFromAWS(secretId);
+  console.log("Retrieving secrets from Parameter Store...");
+  const secrets = await getSecretsFromParameterStore();
 
   const username = secrets.MONGODB_ATLAS_USERNAME;
   const password = secrets.MONGODB_ATLAS_PASSWORD;

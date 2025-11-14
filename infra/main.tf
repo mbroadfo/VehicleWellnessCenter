@@ -41,7 +41,7 @@ variable "environment" {
 }
 
 variable "mongodb_atlas_public_key" {
-  description = "MongoDB Atlas programmatic public API key. Use environment variables or a secrets manager to populate in CI."
+  description = "MongoDB Atlas programmatic public API key. Use environment variables or Parameter Store to populate in CI."
   type        = string
   default     = ""
 }
@@ -455,8 +455,8 @@ resource "aws_ssm_parameter" "auth0_token_cache" {
 # Parameter Store - Application Secrets
 # ============================================================================
 # Stores all application secrets (MongoDB, Auth0, Gemini) in a single
-# SecureString parameter. Replaces AWS Secrets Manager for cost optimization.
-# Cost: FREE (Standard tier, <4KB) vs $0.40/month ($4.80/year) for Secrets Manager
+# SecureString parameter for application secrets.
+# Cost: FREE (Standard tier, <4KB)
 # ============================================================================
 
 resource "aws_ssm_parameter" "application_secrets" {
@@ -479,7 +479,7 @@ resource "aws_ssm_parameter" "application_secrets" {
     Project     = "Vehicle Wellness Center"
     Environment = var.environment
     ManagedBy   = "Terraform"
-    Purpose     = "Application secrets - replacing Secrets Manager for cost optimization"
+    Purpose     = "Application secrets storage"
   }
 
   lifecycle {

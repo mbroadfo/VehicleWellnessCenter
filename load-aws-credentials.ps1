@@ -5,9 +5,9 @@
 
 $env:AWS_PROFILE = "terraform-vwc"
 $env:AWS_REGION = "us-west-2"
-$env:AWS_SECRET_ID = "vehical-wellness-center-dev"
+$env:SSM_SECRETS_PARAMETER_NAME = "/vwc/dev/secrets"
 
 Write-Host "✅ AWS environment configured for Terraform!" -ForegroundColor Green
 Write-Host "Profile: $env:AWS_PROFILE" -ForegroundColor Cyan
 Write-Host "Region: $env:AWS_REGION" -ForegroundColor Cyan
-Write-Host "Secret ID: $env:AWS_SECRET_ID" -ForegroundColor Cyan
+Write-Host "Parameter Store: $env:SSM_SECRETS_PARAMETER_NAME" -ForegroundColor Cyan

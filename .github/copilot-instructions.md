@@ -1,5 +1,5 @@
 <!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit the VS Code Copilot documentation. -->
-- Original Project Vision: Build "Vehicle Wellness Center" tracking MongoDB Atlas vehicle events, AWS Lambda (Node.js) logic, API Gateway with JWT, Secrets Manager, React SPA on S3 with chat pane and vehicle history timeline, infrastructure via Terraform, npm-based workflows, incremental milestones.
+- Original Project Vision: Build "Vehicle Wellness Center" tracking MongoDB Atlas vehicle events, AWS Lambda (Node.js) logic, API Gateway with JWT, React SPA on S3 with chat pane and vehicle history timeline, infrastructure via Terraform, npm-based workflows, incremental milestones.
 - [x] Verify that the copilot-instructions.md file in the .github directory is created. Created template file with checklist and guidelines.
 
 - [x] Clarify Project Requirements Confirmed stack: Terraform IaC, AWS Lambda (Node.js) backend, MongoDB Atlas, React SPA on S3 with chat UI, API Gateway JWT auth, npm tooling.
@@ -87,7 +87,7 @@ DEVELOPMENT RULES:
 - Auth0 M2M applications enable automated token retrieval via Client Credentials flow.
 - Auth0 M2M credentials (client_id, client_secret) stored in Parameter Store, not environment variables.
 - Application secrets: AWS Systems Manager Parameter Store at /vwc/dev/secrets stores all credentials (MongoDB, Auth0, Gemini).
-- Secrets Manager fully removed (Phase 6 complete) - cost savings: $4.80/year realized.
+- Utility scripts (init-collections.ts, test-connection.ts) use Parameter Store for consistency with Lambda.
 - Token caching pattern: Two-tier system (memory + Parameter Store) with 5-minute expiration buffer.
 - Lambda token caching: Memory cache (container-specific, 0-1ms) + Parameter Store (shared, 50-100ms).
 - Parameter Store token format: "token|expiresAt" pipe-delimited string at /vwc/dev/auth0-token-cache.
@@ -154,7 +154,7 @@ When the user indicates a milestone has been reached, execute this checklist sys
 - Check documentation (*.md, *.txt)
 - Check configuration (*.json, *.yaml, *.env.example)
 - Check test files for exposed credentials
-- Verify all secrets use environment variables or AWS Secrets Manager
+- Verify all secrets use environment variables or Parameter Store
 - Confirm `.env` files are gitignored and only `.env.example` templates exist
 
 ### 3. Prepare Changelog Entry

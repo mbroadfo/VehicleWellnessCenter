@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - 2025-11-14
 
+### Removed - Secrets Manager Complete Elimination (Phase 7/8)
+
+- **All Code**: Eliminated ALL Secrets Manager references from entire codebase
+  - **infra/load-tf-env.js**: Now uses Parameter Store for Atlas API keys (was last holdout using old secret)
+  - **Utility Scripts**: `init-collections.ts` and `test-connection.ts` converted to Parameter Store
+  - **Documentation**: Removed Secrets Manager references from all guides except CHANGELOG and migration docs
+  - **Configuration**: Removed `AWS_SECRET_ID` from `.aws-credentials.example` and `load-aws-credentials.ps1`
+  - **IAM Policy**: Removed `SecretsManagerAccess` statement from `terraform-vwc-core-policy-updated.json`
+- **Migration Guide**: Created `docs/parameter-store-atlas-keys-migration.md` with step-by-step instructions to:
+  - Export Atlas API keys from old secret (`vehical-wellness-center-dev`)
+  - Add 4 keys to Parameter Store: `MONGODB_ATLAS_PUBLIC_KEY`, `MONGODB_ATLAS_PRIVATE_KEY`, `MONGODB_ATLAS_ORG_ID`, `MONGODB_ATLAS_PROJECT_ID`
+  - Test Terraform with new Parameter Store source
+  - Delete old secret with 7-day recovery window
+- **Next Step**: User will manually migrate Atlas keys to Parameter Store, then delete old secret in AWS Console
+
 ### Removed - Secrets Manager (Phase 6 Complete)
 
 - **Backend**: Removed AWS Secrets Manager code from `mongodb.ts`

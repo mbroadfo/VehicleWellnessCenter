@@ -16,7 +16,7 @@ npm run infra:destroy # Tear down all infrastructure
 These commands automatically:
 
 - Load AWS credentials (profile: `terraform-vwc`, region: `us-west-2`)
-- Fetch Terraform variables from legacy AWS Secrets Manager secret
+- Fetch Terraform variables from Parameter Store (Atlas API keys, Auth0)
 - Format Terraform files with `terraform fmt` (before plan/apply)
 - Execute in the `infra/` directory
 
@@ -33,13 +33,11 @@ See `docs/Auth0-Setup-Guide.md` for complete setup instructions.
 
 ## Secrets Management
 
-Application secrets (MongoDB, Auth0, Gemini) are stored in AWS Systems Manager Parameter Store:
+Application secrets (MongoDB, Auth0, Gemini) and Terraform variables (Atlas API keys) are stored in AWS Systems Manager Parameter Store:
 
 - **Parameter**: `/vwc/dev/secrets` (SecureString with KMS encryption)
 - **Cost**: FREE (Standard tier)
 - **Setup**: See `docs/parameter-store-setup.md` for provisioning instructions
-
-Note: Terraform variables are still read from legacy Secrets Manager secret `vehical-wellness-center-dev` for Atlas API keys and project IDs.
 
 ## Notes
 

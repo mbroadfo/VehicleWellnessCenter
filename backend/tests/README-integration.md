@@ -173,12 +173,13 @@ aws configure --profile terraform-vwc
 
 ### MongoDB Connection
 
-Tests require AWS Secrets Manager access for MongoDB credentials:
+Tests require AWS Parameter Store access for MongoDB credentials:
 
 ```powershell
-# Verify secret access
-aws secretsmanager get-secret-value `
-  --secret-id vehical-wellness-center-dev `
+# Verify parameter access
+aws ssm get-parameter `
+  --name /vwc/dev/secrets `
+  --with-decryption `
   --profile terraform-vwc
 ```
 

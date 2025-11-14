@@ -37,15 +37,6 @@
       }
     },
     {
-      "Sid": "SecretsManagerAccess",
-      "Effect": "Allow",
-      "Action": [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret"
-      ],
-      "Resource": "arn:aws:secretsmanager:us-west-2:*:secret:vehical-wellness-center-dev-*"
-    },
-    {
       "Sid": "LambdaManagement",
       "Effect": "Allow",
       "Action": [

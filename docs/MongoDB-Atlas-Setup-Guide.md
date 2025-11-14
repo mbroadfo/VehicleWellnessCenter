@@ -1,6 +1,6 @@
 # Vehicle Wellness Center MongoDB Atlas Guide
 
-End-to-end checklist for standing up the Vehicle Wellness Center MongoDB Atlas project, serverless cluster, and Secrets Manager integration with strong security practices.
+End-to-end checklist for standing up the Vehicle Wellness Center MongoDB Atlas project, serverless cluster, and Parameter Store integration with strong security practices.
 
 ## 🎯 Overview
 
@@ -9,14 +9,14 @@ This guide covers:
 - Creating the `Vehicle Wellness Center` Atlas project (or using an existing one)
 - Provisioning the `vehicalwellnesscenter-cluster` serverless instance and base database
 - Generating/storing API keys and connection credentials
-- Coordinating AWS Secrets Manager entries consumed by Terraform and Lambda
+- Coordinating AWS Parameter Store entries consumed by Terraform and Lambda
 - Recommended access control patterns for Atlas users and IP allow lists
 
 ## 📋 Prerequisites
 
 - Access to MongoDB Atlas organization
 - Organization admin or project creator permissions in Atlas
-- AWS account (Secrets Manager + IAM access)
+- AWS account (Parameter Store + IAM access)
 - Understanding of connection string formats
 
 ## 🏗️ Step 1: Create New Atlas Project
@@ -104,7 +104,7 @@ Record the actual Organization ID (e.g., `5d5c09149ccf64c5d84a9f0d`).
 # Vehicle Wellness Center defaults
 Cluster Type: M0 (Free Tier)
 Cloud Provider: AWS
-Region: us-west-2 (matches Lambda + Secrets Manager usage)
+Region: us-west-2 (matches Lambda + Parameter Store usage)
 Cluster Name: vehicalwellnesscenter-cluster
 ```
 
@@ -116,8 +116,8 @@ Cluster Name: vehicalwellnesscenter-cluster
 **Initial admin user:**
 
 - During project creation Atlas prompts for an admin user. Set the username to `vwc_admin_db_user` (or your preferred admin label) and copy the generated password immediately. Atlas will not show the password again.
-- Save the username and password into AWS Secrets Manager under `vehicle-wellness-center/mongodb/atlas-admin` (or similar) before leaving the setup wizard.
-- Use those values to populate the `MONGODB_ATLAS_URI`, `MONGODB_ATLAS_USERNAME`, and `MONGODB_ATLAS_PASSWORD` fields in Secrets Manager.
+- Save the username and password into AWS Parameter Store at `/vwc/dev/secrets` before leaving the setup wizard.
+- Use those values to populate the `MONGODB_ATLAS_HOST`, `MONGODB_ATLAS_USERNAME`, and `MONGODB_ATLAS_PASSWORD` fields in Parameter Store.
 
 **Additional users:**
 
@@ -128,7 +128,7 @@ Cluster Name: vehicalwellnesscenter-cluster
 **🔒 Critical Security Practice:**
 
 - **Never hardcode passwords** in code or configuration files
-- **Use AWS Secrets Manager** for both admin and application credential storage
+- **Use AWS Parameter Store** for both admin and application credential storage
 - **Generate strong passwords** (32+ characters, mixed case, numbers, symbols)
 - **Rotate credentials regularly** (every 90 days minimum)
 
@@ -186,20 +186,21 @@ mongodb+srv://vwc_admin_db_user:<password>@vehicalwellnesscenter-c.shpig7c.mongo
 const mongoUri = "mongodb+srv://admin:mypassword123@cluster.mongodb.net/myapp";
 ```
 
-**✅ AWS Secrets Manager Pattern (Recommended):**
+**✅ AWS Parameter Store Pattern (Recommended):**
 
 ```javascript
 // ✅ Secure credential retrieval
-import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 
 async function getMongoUri() {
-  const client = new SecretsManagerClient({ region: "us-west-2" });
-  const command = new GetSecretValueCommand({
-  SecretId: "vehicle-wellness-center/mongodb/atlas"
+  const client = new SSMClient({ region: "us-west-2" });
+  const command = new GetParameterCommand({
+    Name: "/vwc/dev/secrets",
+    WithDecryption: true
   });
   
   const response = await client.send(command);
-  const secrets = JSON.parse(response.SecretString);
+  const secrets = JSON.parse(response.Parameter.Value);
   return secrets.MONGODB_ATLAS_URI;
 }
 ```
@@ -208,7 +209,7 @@ async function getMongoUri() {
 
 ```json
 {
-  "MONGODB_ATLAS_URI": "mongodb+srv://vwc_admin_db_user:ACTUAL_PASSWORD@vehicalwellnesscenter-c.shpig7c.mongodb.net/?appName=vehicalwellnesscenter-cluster",
+  "MONGODB_ATLAS_HOST": "vehicalwellnesscenter-c.shpig7c.mongodb.net",
   "MONGODB_ATLAS_USERNAME": "vwc_admin_db_user",
   "MONGODB_ATLAS_PASSWORD": "ACTUAL_PASSWORD",
   "MONGODB_DATABASE_NAME": "vehicle_wellness_center"
@@ -257,7 +258,7 @@ variable "mongodb_atlas_project_id" {
 }
 
 variable "mongodb_database_user_secret_id" {
-  description = "Secrets Manager ARN containing MongoDB app user credentials"
+  description = "Parameter Store name containing MongoDB app user credentials"
   type        = string
 }
 ```
@@ -275,13 +276,9 @@ resource "mongodbatlas_serverless_instance" "vehicle" {
   provider_settings_region_name           = var.mongodb_atlas_region
 }
 
-data "aws_secretsmanager_secret_version" "mongodb_database_user" {
-  secret_id = var.mongodb_database_user_secret_id
-}
-
-resource "mongodbatlas_database_user" "vehicle_app" {
-  username           = jsondecode(nonsensitive(data.aws_secretsmanager_secret_version.mongodb_database_user.secret_string)).username
-  password           = jsondecode(nonsensitive(data.aws_secretsmanager_secret_version.mongodb_database_user.secret_string)).password
+# MongoDB database user is managed manually in Atlas UI
+# Credentials stored in Parameter Store at /vwc/dev/secrets
+# Username: vwc_admin_db_user (readWriteAnyDatabase@admin)
   project_id         = var.mongodb_atlas_project_id
   auth_database_name = "admin"
 
@@ -329,9 +326,9 @@ Connection String: mongodb+srv://vwc_admin_db_user:<password>@vehicalwellnesscen
 - [ ] Workstation and Lambda CIDR blocks added to project network access
 - [ ] `vwc_admin_db_user` created with strong password
 - [ ] Connection string verified via mongosh/VS Code
-- [ ] Credentials mirrored in AWS Secrets Manager (JSON secrets)
+- [ ] Credentials stored in AWS Parameter Store (SecureString at /vwc/dev/secrets)
 - [ ] Terraform variables updated with secret ARNs/IDs
-- [ ] Organization and Project IDs documented in Secrets Manager/Parameter Store
+- [ ] Organization and Project IDs documented in legacy secret (for Terraform Atlas provider)
 
 ## 🚨 Security Best Practices
 
@@ -343,7 +340,7 @@ Connection String: mongodb+srv://vwc_admin_db_user:<password>@vehicalwellnesscen
 Username: vwc_admin_db_user (admin fallback)
 Password: Generated 32+ character password
 Privileges: Atlas admin (full access)
-Storage: AWS Secrets Manager only
+Storage: AWS Parameter Store only
 Rotation: Every 90 days minimum
 ```
 
@@ -361,7 +358,7 @@ Read-Only User: Analytics/reporting account (optional)
 **Monthly Rotation Process:**
 
 1. Generate new password in Atlas
-2. Update AWS Secrets Manager
+2. Update AWS Parameter Store
 3. Deploy applications with new credentials
 4. Verify connectivity
 5. Remove old credentials
@@ -381,7 +378,7 @@ Read-Only User: Analytics/reporting account (optional)
 - [MongoDB Atlas Documentation](https://docs.atlas.mongodb.com/)
 - [Atlas API Reference](https://docs.atlas.mongodb.com/reference/api/)
 - [Terraform MongoDB Atlas Provider](https://registry.terraform.io/providers/mongodb/mongodbatlas/latest/docs)
-- [AWS Secrets Manager Best Practices](https://docs.aws.amazon.com/secretsmanager/latest/userguide/best-practices.html)
+- [AWS Systems Manager Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html)
 
 ## 🔧 Troubleshooting
 

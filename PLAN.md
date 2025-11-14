@@ -4,7 +4,7 @@
 
 - Build from the data layer upward, enabling incremental commits after major milestones.
 - Favor serverless, pay-per-use services (MongoDB Atlas, AWS Lambda, API Gateway, S3) to stay within free tier limits.
-- Manage configuration and secrets centrally via AWS Secrets Manager; never commit secrets.
+- Manage configuration and secrets centrally via AWS Systems Manager Parameter Store; never commit secrets.
 - Use npm scripts to orchestrate linting, testing, builds, and deployments.
 
 ## Milestone 1: Data Foundation
@@ -17,7 +17,7 @@
 
 ## Milestone 2: Secrets & Configuration
 
-1. **Provision Secrets Manager entries** for MongoDB credentials, JWT signing keys, and third-party integrations (dealer APIs).
+1. **Provision Parameter Store entries** for MongoDB credentials, JWT signing keys, and third-party integrations (dealer APIs).
 2. **Add IAM roles and policies** granting Lambda read-only access to secrets, limited VPC/network configuration if required.
 3. **Define environment configuration module** (shared TypeScript package or utilities) to read secrets and environment variables safely.
 4. **Commit**: `feat(config): wire secrets management and shared env loader`.
