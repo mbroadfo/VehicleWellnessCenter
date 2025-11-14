@@ -434,6 +434,14 @@ resource "aws_iam_role_policy" "vwc_lambda_secrets" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = data.aws_secretsmanager_secret_version.mongodb_database_user.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:PutParameter"
+        ]
+        Resource = aws_ssm_parameter.auth0_token_cache.arn
       }
     ]
   })
@@ -447,6 +455,31 @@ resource "aws_iam_role_policy_attachment" "vwc_lambda_basic" {
 output "lambda_execution_role_arn" {
   description = "ARN of the IAM role for Lambda function execution"
   value       = aws_iam_role.vwc_lambda_exec.arn
+}
+
+# ============================================================================
+# Parameter Store - Auth0 Token Cache
+# ============================================================================
+# Stores Auth0 M2M bearer token with expiration metadata for sharing across
+# all Lambda container instances. Eliminates redundant Auth0 token requests.
+# ============================================================================
+
+resource "aws_ssm_parameter" "auth0_token_cache" {
+  name        = "/vwc/${var.environment}/auth0-token-cache"
+  description = "Cached Auth0 M2M bearer token with expiration metadata (format: token|expiresAt)"
+  type        = "String"
+  value       = "not-initialized|0" # Placeholder - Lambda manages at runtime
+  tier        = "Standard"
+
+  tags = {
+    Project     = "Vehicle Wellness Center"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+
+  lifecycle {
+    ignore_changes = [value, description] # Lambda updates these at runtime
+  }
 }
 
 # ============================================================================
@@ -478,10 +511,11 @@ resource "aws_lambda_function" "vwc" {
 
   environment {
     variables = {
-      AWS_SECRET_ID    = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
-      MONGODB_DATABASE = var.mongodb_database_name
-      LAMBDA_APP_URL   = aws_apigatewayv2_api.vwc_api.api_endpoint
-      NODE_ENV         = var.environment
+      AWS_SECRET_ID              = data.aws_secretsmanager_secret_version.mongodb_database_user.secret_id
+      MONGODB_DATABASE           = var.mongodb_database_name
+      LAMBDA_APP_URL             = aws_apigatewayv2_api.vwc_api.api_endpoint
+      NODE_ENV                   = var.environment
+      AUTH0_TOKEN_PARAMETER_NAME = aws_ssm_parameter.auth0_token_cache.name
     }
   }
 

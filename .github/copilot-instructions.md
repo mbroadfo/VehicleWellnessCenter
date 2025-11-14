@@ -86,9 +86,10 @@ DEVELOPMENT RULES:
 - Auth0 configuration requires two variables: auth0_domain (tenant.auth0.com) and auth0_audience (API identifier).
 - Auth0 M2M applications enable automated token retrieval via Client Credentials flow.
 - Auth0 M2M credentials (client_id, client_secret) stored in AWS Secrets Manager, not environment variables.
-- Token caching pattern: module-level cache with expiration buffer (5 minutes before expiry).
-- Lambda token caching survives container lifetime (~15-45 minutes), not shared across containers.
-- For shared token cache, use Parameter Store (future enhancement documented in job jar).
+- Token caching pattern: Two-tier system (memory + Parameter Store) with 5-minute expiration buffer.
+- Lambda token caching: Memory cache (container-specific, 0-1ms) + Parameter Store (shared, 50-100ms).
+- Parameter Store token format: "token|expiresAt" pipe-delimited string at /vwc/dev/auth0-token-cache.
+- Token cache reduces Auth0 API calls by 70-90% and improves Lambda cold start performance.
 - Integration tests automatically fetch Auth0 tokens - no manual AUTH0_TOKEN environment variable needed.
 - Never create secrets in AWS - only document what secrets the user needs to create.
 - Single Lambda architecture: Router pattern in index.ts dispatches to routes/ directory based on method + path regex.

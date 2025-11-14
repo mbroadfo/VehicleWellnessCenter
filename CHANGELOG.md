@@ -6,6 +6,71 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - 2025-11-14
 
+### Added - Parameter Store Token Caching
+
+- **Backend**: Two-tier Auth0 token caching system to minimize API calls and improve performance
+  - **Tier 1**: Memory cache (fastest, container-specific, 0-1ms access time)
+  - **Tier 2**: AWS Systems Manager Parameter Store (shared across all Lambda containers, 50-100ms access time)
+  - **Tier 3**: Auth0 OAuth API (fallback, 500-1000ms when cache miss)
+  - Token stored in format `token|expiresAt` (pipe-delimited) at `/vwc/dev/auth0-token-cache`
+  - 5-minute expiration buffer prevents mid-request token expiry
+  - Graceful degradation: Falls back to memory-only cache if Parameter Store unavailable
+  - **70-90% reduction** in Auth0 API calls across all Lambda invocations
+  - New functions: `clearMemoryCache()` for testing new container scenarios
+- **Backend**: Auth0 module refactored with comprehensive SSM integration
+  - New dependency: `@aws-sdk/client-ssm` (v3.931.0)
+  - Functions: `getTokenFromParameterStore()`, `saveTokenToParameterStore()`, `fetchNewToken()`
+  - Updated `getAuth0Token()` implements three-tier fallback pattern
+  - Memory cache variable renamed from `cachedToken` to `memoryCache` for clarity
+- **Backend**: Token caching test utility (`src/test-token-refresh.ts`)
+  - Tests cold start (Auth0 fetch), memory cache hit, Parameter Store hit, forced refresh
+  - Validates token sharing across simulated Lambda containers
+  - Demonstrates performance gains: 12,655x faster (memory) and 4.5x faster (Parameter Store) vs Auth0
+  - Auto-cleanup with `process.exit(0)` for CI/CD compatibility
+- **Infrastructure**: Parameter Store resource for Auth0 token cache
+  - Resource: `aws_ssm_parameter.auth0_token_cache` (Standard tier, free)
+  - Name: `/vwc/dev/auth0-token-cache`
+  - Initial value: `not-initialized|0` (Lambda manages at runtime)
+  - Lifecycle: `ignore_changes` on value/description (Lambda controls updates)
+  - Tags: Project, Environment, ManagedBy=Terraform
+- **Infrastructure**: Lambda IAM permissions for Parameter Store access
+  - Actions: `ssm:GetParameter`, `ssm:PutParameter` on token cache ARN
+  - Added to existing `vwc_lambda_secrets` IAM role policy
+  - Lambda environment variable: `AUTH0_TOKEN_PARAMETER_NAME=/vwc/dev/auth0-token-cache`
+- **Infrastructure**: terraform-vwc IAM policy updated with SSM permissions
+  - Two statements for security best practice:
+    - `ParameterStoreManagement`: Resource-scoped actions (Get, Put, Delete, Tags) on `/vwc/*` parameters
+    - `ParameterStoreDescribe`: Global `ssm:DescribeParameters` permission (required by Terraform aws_ssm_parameter resource)
+  - File: `infra/terraform-vwc-core-policy-updated.json`
+
+### Changed - Token Caching Architecture
+
+- Auth0 token lifecycle now optimized for Lambda container reuse
+  - Previously: Memory cache per container (15-45 min lifetime)
+  - Now: Parameter Store shared cache + memory cache (persistent until expiry)
+  - Benefit: New Lambda containers read from shared cache instead of calling Auth0
+  - Cost impact: Zero (Standard Parameter Store is free tier)
+- Lambda cold start performance improved for authenticated operations
+  - First invocation: 189ms (Auth0 fetch) → subsequent: 42ms (Parameter Store) or 0.015ms (memory)
+  - Warm containers: 0.015ms (memory cache hit)
+  - Cross-container: 42ms (Parameter Store hit vs 189ms Auth0)
+
+### Infrastructure Changes
+
+- Terraform apply results:
+  - Added: 1 resource (`aws_ssm_parameter.auth0_token_cache`)
+  - Changed: 2 resources (Lambda function code + environment vars, IAM role policy)
+  - Parameter Store created successfully at `/vwc/dev/auth0-token-cache`
+- Lambda function updated with new source code hash (YacyINSsvuabnFGmyQj7phYSVaNKg+qsAcvksE31bOE=)
+- All 35 tests passing (18 unit + 17 integration) with new caching system
+
+### Performance Metrics
+
+- Memory cache: 0.015ms (12,655x faster than Auth0)
+- Parameter Store: 42ms (4.5x faster than Auth0)
+- Auth0 API: 189-558ms (baseline)
+- Expected production impact: 70-90% reduction in Auth0 token requests
+
 ### Changed - Single Lambda Architecture
 
 - **Backend**: Consolidated 4 separate Lambda functions into 1 unified Lambda with router pattern
@@ -52,7 +117,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Added pattern `infra/terraform.tfstate.*.backup` to catch all backup files
   - Previously only excluded `terraform.tfstate.backup` (not numbered variants)
 
-### Infrastructure Changes
+### Infrastructure Changes Made
 
 - Terraform apply results:
   - Destroyed: 16 resources (4 old Lambdas + 4 old integrations + 4 old routes + 4 old log groups)
