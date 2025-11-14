@@ -4,7 +4,7 @@ Full-stack platform for tracking vehicle maintenance, incidents, and upgrades. T
 
 ## Project Structure
 
-- `infra/` – Terraform IaC for MongoDB Atlas, AWS Lambda, API Gateway, S3 hosting, and Secrets Manager integration.
+- `infra/` – Terraform IaC for MongoDB Atlas, AWS Lambda, API Gateway, S3 hosting, and Parameter Store integration.
 - `backend/` – Node.js Lambda handlers orchestrating vehicle event management and integrations.
 - `frontend/` – React SPA (Vite + TypeScript) featuring chat-driven insights and a vehicle history timeline.
 - `docs/` – Technical documentation for data models, MongoDB Atlas setup, and secrets management.
@@ -40,15 +40,15 @@ This sets:
 
 - `AWS_PROFILE=terraform-vwc`
 - `AWS_REGION=us-west-2`
-- `AWS_SECRET_ID=vehical-wellness-center-dev`
+- `SSM_SECRETS_PARAMETER_NAME=/vwc/dev/secrets`
 
-### 3. Populate AWS Secrets Manager
+### 3. Populate AWS Systems Manager Parameter Store
 
-Create a secret named `vehical-wellness-center-dev` in AWS Secrets Manager (us-west-2) with the structure from `infra/secret-example.json`. See `docs/atlas-secrets-todo.md` for details.
+Create a SecureString parameter at `/vwc/dev/secrets` in AWS Systems Manager Parameter Store (us-west-2) with the structure from `infra/parameter-example.json`. See `docs/parameter-store-setup.md` for details.
 
 ### 4. Test MongoDB Connection
 
-Verify connectivity to MongoDB Atlas via AWS Secrets Manager:
+Verify connectivity to MongoDB Atlas via Parameter Store:
 
 ```powershell
 npm run test:connection
@@ -114,7 +114,7 @@ npm run clean:all          # Clean all node_modules
 - **`PLAN.md`** – Implementation roadmap with milestones
 - **`docs/data-model.md`** – MongoDB schema and collection design
 - **`docs/MongoDB-Atlas-Setup-Guide.md`** – Atlas project and cluster setup
-- **`docs/atlas-secrets-todo.md`** – Secrets Manager provisioning checklist
+- **`docs/parameter-store-setup.md`** – Parameter Store secrets provisioning
 - **`backend/README.md`** – Backend Lambda function details
 - **`frontend/README.md`** – React SPA development guide
 - **`infra/README.md`** – Terraform resource documentation
@@ -125,7 +125,7 @@ npm run clean:all          # Clean all node_modules
 
 - **MongoDB Atlas** – Serverless instance in us-west-2 (AWS-backed)
 - **AWS Lambda** – Node.js runtime with IAM role-based permissions
-- **AWS Secrets Manager** – Centralized credential storage
+- **AWS Systems Manager Parameter Store** – Centralized credential storage (FREE)
 - **API Gateway** – RESTful API with JWT authorization
 - **S3** – Static SPA hosting and vehicle media storage
 - **Terraform** – Infrastructure as Code
@@ -134,7 +134,7 @@ npm run clean:all          # Clean all node_modules
 
 - No hardcoded credentials
 - IAM roles for Lambda execution (no access keys in production)
-- Secrets Manager integration for MongoDB credentials
+- Parameter Store SecureString integration for application secrets (MongoDB, Auth0, Gemini)
 - JWT-based API authentication
 
 ## License

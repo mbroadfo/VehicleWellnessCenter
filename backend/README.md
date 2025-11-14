@@ -17,7 +17,7 @@ npm run build:backend      # Compile TypeScript to dist/
 ```powershell
 npm run test:backend       # Run unit tests with Vitest
 npm run test:backend:watch # Run tests in watch mode
-npm run test:connection    # Test MongoDB Atlas connection via Secrets Manager
+npm run test:connection    # Test MongoDB Atlas connection via Parameter Store
 npm run seed:test          # Seed test data for API validation (auto-cleans after 3s)
 ```
 
@@ -64,9 +64,9 @@ All API endpoints are protected with Auth0 JWT authentication - valid tokens req
 
 ## MongoDB Connection
 
-All Lambda functions connect to MongoDB Atlas using credentials retrieved from AWS Secrets Manager:
+All Lambda functions connect to MongoDB Atlas using credentials retrieved from AWS Systems Manager Parameter Store:
 
-- Secret ID: `vehical-wellness-center-dev`
+- Parameter: `/vwc/dev/secrets` (SecureString)
 - Region: `us-west-2`
 - Required fields: `MONGODB_ATLAS_HOST`, `MONGODB_ATLAS_USERNAME`, `MONGODB_ATLAS_PASSWORD`
 
@@ -83,7 +83,7 @@ npm run test:connection
 
 This verifies:
 
-- AWS Secrets Manager access
+- AWS Parameter Store access
 - MongoDB Atlas connectivity
 - Database and collection visibility
 
@@ -108,7 +108,8 @@ Use this for quick end-to-end validation of deployed Lambda functions.
 ## Dependencies
 
 - **mongodb** – Official MongoDB Node.js driver
-- **@aws-sdk/client-secrets-manager** – AWS Secrets Manager client
+- **@aws-sdk/client-ssm** – AWS Systems Manager (Parameter Store) client
+- **@google/generative-ai** – Google Gemini AI SDK
 - **typescript** – TypeScript compiler
 - **vitest** – Unit testing framework
 - **eslint** – Code linting with TypeScript support
