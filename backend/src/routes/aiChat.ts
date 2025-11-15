@@ -104,6 +104,24 @@ const FUNCTION_DECLARATIONS = [
       },
       required: ["vehicleId", "type", "occurredAt", "summary"]
     }
+  },
+  {
+    name: "enrichVehicleFromVIN",
+    description: "Decode VIN and enrich vehicle with specifications from NHTSA vPIC API. Returns engine specs, body type, safety features, transmission details. Use this when user provides a VIN or asks about vehicle specifications.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        vehicleId: {
+          type: SchemaType.STRING,
+          description: "The MongoDB ObjectId of the vehicle to enrich"
+        },
+        vin: {
+          type: SchemaType.STRING,
+          description: "Optional 17-character Vehicle Identification Number. If not provided, will use VIN already stored in vehicle document."
+        }
+      },
+      required: ["vehicleId"]
+    }
   }
 ];
 
@@ -113,12 +131,13 @@ You are a Vehicle Data Curator AI for the Vehicle Wellness Center application.
 
 YOUR ROLE:
 You help users manage their vehicle history by creating, reading, and understanding 
-vehicle events. You ensure data integrity and help users maintain accurate records.
+vehicle events. You also enrich vehicle data with specifications from authoritative sources.
 
 AVAILABLE TOOLS:
 1. getVehicleOverview(vehicleId) - Get vehicle details from MongoDB
 2. listVehicleEvents(vehicleId, eventType?, limit?) - List vehicle events from MongoDB
 3. recordVehicleEvent(vehicleId, type, occurredAt, summary, cost?, mileage?, notes?) - Create event in MongoDB
+4. enrichVehicleFromVIN(vehicleId, vin?) - Decode VIN and enrich vehicle with NHTSA specifications
 
 DATA INTEGRITY RULES (CRITICAL):
 
@@ -243,6 +262,34 @@ async function executeFunctionCall(
         if (cost !== undefined) payload.cost = cost;
         if (mileage !== undefined) payload.mileage = mileage;
         if (notes) payload.notes = notes;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API call failed (${response.status}): ${errorText}`);
+        }
+
+        return await response.json();
+      }
+
+      case "enrichVehicleFromVIN": {
+        const { vehicleId, vin } = args as {
+          vehicleId: string;
+          vin?: string;
+        };
+
+        const url = `${baseUrl}/vehicles/${vehicleId}/enrich`;
+        const payload: Record<string, unknown> = {};
+
+        if (vin) payload.vin = vin;
 
         const response = await fetch(url, {
           method: "POST",

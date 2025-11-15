@@ -3,6 +3,7 @@ import { handler as getVehicleOverviewHandler } from "./routes/getVehicleOvervie
 import { handler as listVehicleEventsHandler } from "./routes/listVehicleEvents";
 import { handler as recordVehicleEventHandler } from "./routes/recordVehicleEvent";
 import { handler as aiChatHandler } from "./routes/aiChat";
+import { enrichVehicleHandler } from "./routes/enrichVehicle";
 
 /**
  * Main Lambda Router
@@ -41,6 +42,10 @@ export const handler = async (
 
     if (method === "POST" && path === "/ai/chat") {
       return await aiChatHandler(event);
+    }
+
+    if (method === "POST" && path.match(/^\/vehicles\/[^/]+\/enrich$/)) {
+      return await enrichVehicleHandler(event);
     }
 
     // 404 - Route not found

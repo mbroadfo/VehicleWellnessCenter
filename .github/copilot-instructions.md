@@ -108,6 +108,14 @@ DEVELOPMENT RULES:
 - Cost optimization opportunities: Continuously evaluate AWS service costs; Parameter Store Standard tier is free, while Secrets Manager costs $0.40/month/secret.
 - Markdown linting fixes: For systematic issues (blank lines, heading spacing), use PowerShell regex scripts or markdownlint-cli2 rather than manual replace_string_in_file calls.
 - Migration commit strategy: Plan 5-6 milestone commits aligned with major phases (infrastructure, code implementation, cutover, documentation, cleanup).
+- AWS Parameter Store path restrictions: Cannot contain colons (:) - use forward slashes (/) for hierarchy (e.g., /vwc/cache/vin/ABC123, not vin:ABC123).
+- JSON deserialization from Parameter Store: Requires dateReviver function for Date objects - regex match ISO 8601 strings and convert to Date.
+- Test data constants: Use named constants (TEST_VIN, TEST_VEHICLE_ID) instead of hardcoding values throughout test files for maintainability.
+- Cache test reliability: Call clearCache() before timing tests to ensure fresh API calls and accurate performance measurements.
+- Test cleanup patterns: Use beforeAll() to delete existing test data (prevents duplicate key errors on reruns), use afterAll() for final cleanup.
+- VIN validation standard: ISO 3779 with check digit algorithm (weighted sum modulo 11) - position 9 is check digit, no I/O/Q characters allowed.
+- External API caching: Two-tier pattern (memory + Parameter Store) with appropriate TTLs based on data mutability (30 days for VIN specs, shorter for recalls/prices).
+- CHANGELOG same-day commits: Use unique descriptive titles for multiple same-day entries (e.g., [Feature Name] - YYYY-MM-DD) or add commit hash for uniqueness.
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.

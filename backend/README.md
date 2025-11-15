@@ -57,9 +57,17 @@ All API endpoints are protected with Auth0 JWT authentication - valid tokens req
   - Comprehensive validation (required fields, date format, cost range, ObjectId)
   - Returns 201 with eventId on success
 
+- **POST /vehicles/{vehicleId}/enrich** (`src/routes/enrichVehicle.ts`)
+  - Decodes VIN and enriches vehicle with specifications from NHTSA vPIC API
+  - Request: `{ vin?: string }` (optional if vehicle already has VIN)
+  - Response: `{ success, message, vehicle, specs }` with comprehensive vehicle specifications
+  - Features: ISO 3779 VIN validation, two-tier caching (memory + Parameter Store)
+  - Returns: 145+ vehicle data points (make, model, year, engine, body, safety, transmission)
+
 - **POST /ai/chat** (`src/routes/aiChat.ts`)
   - AI Data Curator with Gemini 2.5 Flash model
   - Function calling: AI calls existing CRUD endpoints via HTTP
+  - Includes enrichVehicleFromVIN tool for automatic VIN decoding
   - Natural language interface for vehicle data queries and updates
 
 ## MongoDB Connection
