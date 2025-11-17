@@ -71,8 +71,9 @@ describe('NHTSA vPIC API Client', () => {
   });
 
   it('should cache VIN decode results', async () => {
-    // Clear cache to ensure fresh API call
-    vehicleDataClient.clearCache();
+    // Clear memory cache to ensure fresh API call
+    const { memoryCache } = await import('./lib/cache.js');
+    memoryCache.clear();
     
     // First call - should hit API
     const start1 = Date.now();
@@ -87,6 +88,8 @@ describe('NHTSA vPIC API Client', () => {
     // Verify results are identical
     expect(specs2.engine.cylinders).toBe(specs1.engine.cylinders);
     expect(specs2.body.type).toBe(specs1.body.type);
+
+    console.log(`Cache performance: API=${duration1}ms, Memory=${duration2}ms`);
 
     // Second call should be significantly faster (cache hit)
     expect(duration2).toBeLessThan(duration1 / 10); // At least 10x faster
@@ -129,6 +132,9 @@ describe('Enrich Vehicle Endpoint', () => {
 
     // Decode VIN
     const specs = await vehicleDataClient.decodeVIN(vehicle!.vin);
+    expect(specs).toBeDefined();
+    expect(specs!.engine).toBeDefined();
+    expect(specs!.body).toBeDefined();
 
     // Update vehicle with specs
     await vehiclesCollection.updateOne(

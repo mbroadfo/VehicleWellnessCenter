@@ -4,6 +4,7 @@
  */
 
 import { getParameter, putParameter } from './parameterStore.js';
+import { memoryCache } from './cache.js';
 
 // ============================================================================
 // Type Definitions
@@ -291,40 +292,60 @@ export class VehicleDataClient {
    * Cache TTL: 30 days (specs don't change)
    */
   async decodeVIN(vin: string): Promise<VehicleSpecs> {
-    const cacheKey = `vin/${vin}`;  // Use slash, not colon (AWS Parameter Store restriction)
-    const TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+    const cacheKey = `vin:${vin}`;
 
-    return this.cache.get(
-      cacheKey,
-      async () => {
-        const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vin}?format=json`;
+    // Check memory cache (Lambda container reuse)
+    const cached = memoryCache.get<VehicleSpecs>(cacheKey);
+    if (cached) return cached;
 
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(
-            `NHTSA vPIC API returned ${response.status}: ${response.statusText}`
-          );
-        }
+    // Fetch from NHTSA vPIC API
+    console.log(`[VIN Decode] Fetching specs for VIN: ${vin}`);
+    const specs = await this.fetchVPICData(vin);
 
-        const data = (await response.json()) as VPICResponse;
+    // Cache in memory for 24 hours (Lambda container lifetime)
+    memoryCache.set(cacheKey, specs, 24 * 60 * 60);
 
-        if (!data.Results || data.Results.length === 0) {
-          throw new Error('No results returned from NHTSA vPIC API');
-        }
+    return specs;
+    // Note: Caller (enrichVehicle route) stores in MongoDB vehicle.specs permanently
+  }
 
-        const result = data.Results[0];
+  /**
+   * Fetch vehicle specs from NHTSA vPIC API
+   */
+  private async fetchVPICData(vin: string): Promise<VehicleSpecs> {
+    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vin}?format=json`;
 
-        // Check for API errors
-        if (result.ErrorCode && result.ErrorCode !== '0') {
-          throw new Error(
-            `NHTSA vPIC Error: ${result.ErrorText || 'Unknown error'}`
-          );
-        }
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new ExternalAPIError(
+        'NHTSA vPIC',
+        new Error(`HTTP ${response.status}: ${response.statusText}`),
+        false
+      );
+    }
 
-        return this.mapVPICResponse(result);
-      },
-      TTL_SECONDS
-    );
+    const data = (await response.json()) as VPICResponse;
+
+    if (!data.Results || data.Results.length === 0) {
+      throw new ExternalAPIError(
+        'NHTSA vPIC',
+        new Error('No results returned from API'),
+        false
+      );
+    }
+
+    const result = data.Results[0];
+
+    // Check for API errors
+    if (result.ErrorCode && result.ErrorCode !== '0') {
+      throw new ExternalAPIError(
+        'NHTSA vPIC',
+        new Error(result.ErrorText || 'Unknown error'),
+        false
+      );
+    }
+
+    return this.mapVPICResponse(result);
   }
 
   /**
@@ -375,54 +396,51 @@ export class VehicleDataClient {
     model: string,
     year: number
   ): Promise<RecallData[]> {
-    const cacheKey = `recalls/${make}/${model}/${year}`;
+    const cacheKey = `recalls:${make}:${model}:${year}`;
     const TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-    try {
-      return await this.cache.get(
-        cacheKey,
-        async () => {
-          const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(
-            make
-          )}&model=${encodeURIComponent(model)}&modelYear=${year}`;
+    // Check memory cache
+    const cached = memoryCache.get<RecallData[]>(cacheKey);
+    if (cached) return cached;
 
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(
-              `NHTSA Recalls API returned ${response.status}: ${response.statusText}`
-            );
-          }
-
-          const data = (await response.json()) as RecallsAPIResponse;
-
-          if (!data.results) {
-            throw new Error('No results returned from NHTSA Recalls API');
-          }
-
-          // Map API response to our format
-          return data.results.map((recall) => ({
-            manufacturer: recall.Manufacturer,
-            NHTSACampaignNumber: recall.NHTSACampaignNumber,
-            reportReceivedDate: recall.ReportReceivedDate,
-            component: recall.Component,
-            summary: recall.Summary,
-            consequence: recall.Consequence,
-            remedy: recall.Remedy,
-            notes: recall.Notes,
-            modelYear: recall.ModelYear,
-            make: recall.Make,
-            model: recall.Model,
-          }));
-        },
-        TTL_SECONDS
-      );
-    } catch (error) {
+    // Fetch from NHTSA Recalls API
+    const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${year}`;
+    const response = await fetch(url);
+    if (!response.ok) {
       throw new ExternalAPIError(
         'NHTSA Recalls',
-        error as Error,
-        false // No fallback for recalls
+        new Error(`HTTP ${response.status}: ${response.statusText}`),
+        false
       );
     }
+
+    const data = (await response.json()) as RecallsAPIResponse;
+    if (!data.results) {
+      throw new ExternalAPIError(
+        'NHTSA Recalls',
+        new Error('No results returned from NHTSA Recalls API'),
+        false
+      );
+    }
+
+    // Map API response to our format
+    const recalls = data.results.map((recall) => ({
+      manufacturer: recall.Manufacturer,
+      NHTSACampaignNumber: recall.NHTSACampaignNumber,
+      reportReceivedDate: recall.ReportReceivedDate,
+      component: recall.Component,
+      summary: recall.Summary,
+      consequence: recall.Consequence,
+      remedy: recall.Remedy,
+      notes: recall.Notes,
+      modelYear: recall.ModelYear,
+      make: recall.Make,
+      model: recall.Model,
+    }));
+
+    // Cache in memory for 7 days
+    memoryCache.set(cacheKey, recalls, TTL_SECONDS);
+    return recalls;
   }
 
   /**
@@ -434,54 +452,51 @@ export class VehicleDataClient {
     model: string,
     year: number
   ): Promise<ComplaintData[]> {
-    const cacheKey = `complaints/${make}/${model}/${year}`;
+    const cacheKey = `complaints:${make}:${model}:${year}`;
     const TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
-    try {
-      return await this.cache.get(
-        cacheKey,
-        async () => {
-          const url = `https://api.nhtsa.gov/complaints/complaintsByVehicle?make=${encodeURIComponent(
-            make
-          )}&model=${encodeURIComponent(model)}&modelYear=${year}`;
+    // Check memory cache
+    const cached = memoryCache.get<ComplaintData[]>(cacheKey);
+    if (cached) return cached;
 
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(
-              `NHTSA Complaints API returned ${response.status}: ${response.statusText}`
-            );
-          }
-
-          const data = (await response.json()) as ComplaintsAPIResponse;
-
-          if (!data.results) {
-            throw new Error('No results returned from NHTSA Complaints API');
-          }
-
-          // Map API response to our format
-          return data.results.map((complaint) => ({
-            odiNumber: complaint.odiNumber,
-            manufacturer: complaint.manufacturer,
-            crash: complaint.crash,
-            fire: complaint.fire,
-            numberOfInjuries: complaint.numberOfInjuries,
-            numberOfDeaths: complaint.numberOfDeaths,
-            dateOfIncident: complaint.dateOfIncident,
-            dateComplaintFiled: complaint.dateComplaintFiled,
-            vin: complaint.vin,
-            components: complaint.components,
-            summary: complaint.summary,
-          }));
-        },
-        TTL_SECONDS
-      );
-    } catch (error) {
+    // Fetch from NHTSA Complaints API
+    const url = `https://api.nhtsa.gov/complaints/complaintsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${year}`;
+    const response = await fetch(url);
+    if (!response.ok) {
       throw new ExternalAPIError(
         'NHTSA Complaints',
-        error as Error,
-        false // No fallback for complaints
+        new Error(`HTTP ${response.status}: ${response.statusText}`),
+        false
       );
     }
+
+    const data = (await response.json()) as ComplaintsAPIResponse;
+    if (!data.results) {
+      throw new ExternalAPIError(
+        'NHTSA Complaints',
+        new Error('No results returned from NHTSA Complaints API'),
+        false
+      );
+    }
+
+    // Map API response to our format
+    const complaints = data.results.map((complaint) => ({
+      odiNumber: complaint.odiNumber,
+      manufacturer: complaint.manufacturer,
+      crash: complaint.crash,
+      fire: complaint.fire,
+      numberOfInjuries: complaint.numberOfInjuries,
+      numberOfDeaths: complaint.numberOfDeaths,
+      dateOfIncident: complaint.dateOfIncident,
+      dateComplaintFiled: complaint.dateComplaintFiled,
+      vin: complaint.vin,
+      components: complaint.components,
+      summary: complaint.summary,
+    }));
+
+    // Cache in memory for 30 days
+    memoryCache.set(cacheKey, complaints, TTL_SECONDS);
+    return complaints;
   }
 
   /**
