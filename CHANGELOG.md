@@ -4,6 +4,99 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Phase 2 - Safety Intelligence] - 2025-11-16
+
+### Added - Safety Data Integration
+
+- **Backend**: NHTSA Recalls and Complaints API integration (FREE government services)
+  - New methods in `VehicleDataClient`: `getRecalls(make, model, year)` and `getComplaints(make, model, year)`
+  - Recalls API: `https://api.nhtsa.gov/recalls/recallsByVehicle?make=X&model=Y&modelYear=Z`
+  - Complaints API: `https://api.nhtsa.gov/complaints/complaintsByVehicle?make=X&model=Y&modelYear=Z`
+  - Two-tier caching: Memory (0-1ms) + Parameter Store (50-100ms) → reduces API calls significantly
+  - Cache TTLs: 7 days for recalls (frequent updates), 30 days for complaints (less frequent)
+  - Cache key formats: `/vwc/cache/recalls/{MAKE}/{MODEL}/{YEAR}` and `/vwc/cache/complaints/{MAKE}/{MODEL}/{YEAR}`
+  - Error handling: `ExternalAPIError` class with structured error messages
+- **Backend**: Safety data TypeScript interfaces
+  - `RecallData`: NHTSACampaignNumber, ReportReceivedDate, Component, Summary, Consequence, Remedy, ModelYear, Make, Model
+  - `ComplaintData`: odiNumber, manufacturer, crash, fire, numberOfInjuries, numberOfDeaths, dateOfIncident, dateComplaintFiled, vin, components, summary
+  - `SafetyData`: recalls array, complaints array, lastChecked timestamp
+- **Backend**: Vehicle safety endpoint (`src/routes/getVehicleSafety.ts`)
+  - Route: `GET /vehicles/{vehicleId}/safety`
+  - Process: Validate ID → Fetch vehicle → Extract make/model/year → Call safety APIs → Return comprehensive safety data
+  - Response: `{ success, recalls, complaints, vehicle }`
+  - Error handling: 400 (validation), 404 (vehicle not found), 502 (API failures), 500 (server errors)
+  - JWT-protected via Auth0
+- **Tests**: Comprehensive safety integration tests (`src/vehicleSafety.test.ts`)
+  - 9 new tests across 3 suites: Recalls API (3 tests), Complaints API (3 tests), Safety Endpoint (3 tests)
+  - Test vehicle: 2017 Jeep Cherokee (make/model/year extracted from decoded VIN)
+  - Cache timing validation: Memory cache hits in 0-1ms
+  - Test cleanup: `beforeAll()` deletes test vehicle, `afterAll()` removes test data
+  - All 9 tests passing with memory cache working perfectly
+  - **Note**: Parameter Store writes fail due to 4KB/32KB size limits (acceptable, memory caching sufficient)
+  - Total test count: 55/55 passing (9 safety + 46 existing)
+- **Backend**: Lambda router updated with safety route
+  - Imported `getVehicleSafetyHandler` in `src/index.ts`
+  - Route pattern: `GET /vehicles/[vehicleId]/safety` with regex match
+  - Integrated alongside existing routes (overview, events, enrich, chat)
+
+### Added - Architecture Documentation
+
+- **Documentation**: External API caching strategy analysis (`docs/external-api-caching-strategy.md`)
+  - Comprehensive analysis of 7 external APIs (current + future phases)
+  - **THE TABLE**: Analyzes each API by mutability, size, freshness requirements, cost, recommended cache tiers, TTL, and rationale
+  - Key insights:
+    - Immutable data (VIN decode, EPA fuel economy, NCAP ratings) → MongoDB only, no expiration
+    - Mutable data (recalls, complaints, investigations) → MongoDB + TTL checking + memory cache
+    - Parameter Store → Secrets and Auth0 tokens ONLY (not for external API caching)
+  - Recommended three-tier cache architecture:
+    - **Tier 1**: MongoDB (primary persistence with TTL fields, 10-20ms access)
+    - **Tier 2**: Memory cache (Lambda container optimization, 0-1ms access)
+    - **Tier 3**: External API (fallback when cache miss or TTL expired, 500ms+ latency)
+  - Performance comparison: MongoDB+memory (20ms cold, 1ms warm) vs current Parameter Store approach (75ms, fails for large data)
+  - Cost analysis: $0 additional (using existing MongoDB) vs $2-5/month for Parameter Store Advanced tier
+  - Migration overview, monitoring strategy, implementation checklist
+- **Documentation**: Parameter Store caching removal migration plan (`docs/job-jar-remove-parameter-store-caching.md`)
+  - Detailed 9-phase migration plan (~7 hours total) to fix Parameter Store misuse
+  - Problem: Parameter Store designed for secrets/config (<4KB), not application data (safety data exceeds limits)
+  - Target architecture: MemoryCache utility class + MongoDB persistence with TTL checking
+  - **Phase 1**: Create MemoryCache utility (30 min) - complete TypeScript implementation provided
+  - **Phase 2**: Refactor VIN decode to memory-only cache, store in MongoDB vehicle.specs (1 hour)
+  - **Phase 3**: Refactor safety APIs to memory cache (1.5 hours)
+  - **Phase 4**: Update safety endpoint with MongoDB TTL checking (1.5 hours) - complete code example
+  - **Phase 5**: Remove DataCache class entirely (30 min)
+  - **Phase 6**: Update all tests for MongoDB assertions (1 hour)
+  - **Phase 7**: Infrastructure cleanup - restrict Parameter Store IAM to secrets only (30 min)
+  - **Phase 8**: Documentation updates (30 min)
+  - **Phase 9**: Deploy and verify (30 min)
+  - MongoDB document structure: `vehicle.specs` (VIN decode), `vehicle.safety.recalls`, `vehicle.safety.complaints` with `lastChecked` timestamps
+  - Rollback plan: Git revert, keep IAM permissions until verified
+  - Success criteria: 46+ tests passing, no Parameter Store errors, MongoDB contains safety data
+
+### Changed - Development Guidelines
+
+- **Copilot Instructions**: Updated with critical external API caching rules
+  - **NEW RULE**: "Parameter Store: ONLY for secrets (/vwc/dev/secrets) and Auth0 token caching (/vwc/dev/auth0-token-cache)"
+  - **NEW RULE**: "DO NOT use Parameter Store for external API response caching (wrong use case, size limits, unnecessary complexity)"
+  - Cache tier definitions for each API type based on mutability:
+    - VIN decode (immutable) → Memory cache → Store in MongoDB vehicle.specs (no expiration)
+    - Safety data (mutable) → Memory cache → Store in MongoDB vehicle.safety with TTL checking
+    - Fuel economy (immutable) → Store in MongoDB vehicle.fuelEconomy.epa on first lookup
+  - Rationale: External APIs are free, data often too large for Parameter Store, MongoDB is better persistence layer
+  - References new strategy and migration documents
+
+### Technical Notes - Safety Intelligence
+
+- NHTSA Recalls API returns JSON with Count, Message, and results array
+- NHTSA Complaints API returns JSON with Count, Message, and results array
+- Cache storage: Parameter Store attempts fail for large datasets (recalls >4KB, complaints >32KB)
+- Memory cache: Works perfectly, sufficient for Lambda container reuse (~15-45 min lifetime)
+- Test strategy: Validation-only tests, skip complex MongoDB mocking, all integration tests pass
+- **Architectural Issue Identified**: Parameter Store misused for application data caching
+  - Parameter Store designed for configuration and secrets (<4KB Standard, <32KB Advanced)
+  - Safety data exceeds limits (recalls 4KB+, complaints 32KB+)
+  - Migration planned to fix architecture: MemoryCache + MongoDB with TTL
+  - Current implementation works (memory cache succeeds), Parameter Store failures non-blocking
+
 ## [Phase 1 - VIN Intelligence] - 2025-11-14
 
 ### Added - VIN Decode & Enrichment

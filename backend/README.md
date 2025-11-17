@@ -64,6 +64,13 @@ All API endpoints are protected with Auth0 JWT authentication - valid tokens req
   - Features: ISO 3779 VIN validation, two-tier caching (memory + Parameter Store)
   - Returns: 145+ vehicle data points (make, model, year, engine, body, safety, transmission)
 
+- **GET /vehicles/{vehicleId}/safety** (`src/routes/getVehicleSafety.ts`)
+  - Fetches active recalls and safety complaints from NHTSA APIs
+  - Response: `{ success, vehicle, safety: { recalls, complaints }, summary: { totalRecalls, totalComplaints } }`
+  - Features: Two-tier caching (memory + Parameter Store), 7-day TTL for recalls, 30-day TTL for complaints
+  - Data sources: NHTSA Recalls API, NHTSA Complaints API (free government services)
+  - Returns: Comprehensive safety data including campaign numbers, dates, components, summaries, injuries/deaths
+
 - **POST /ai/chat** (`src/routes/aiChat.ts`)
   - AI Data Curator with Gemini 2.5 Flash model
   - Function calling: AI calls existing CRUD endpoints via HTTP

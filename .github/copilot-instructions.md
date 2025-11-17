@@ -114,7 +114,15 @@ DEVELOPMENT RULES:
 - Cache test reliability: Call clearCache() before timing tests to ensure fresh API calls and accurate performance measurements.
 - Test cleanup patterns: Use beforeAll() to delete existing test data (prevents duplicate key errors on reruns), use afterAll() for final cleanup.
 - VIN validation standard: ISO 3779 with check digit algorithm (weighted sum modulo 11) - position 9 is check digit, no I/O/Q characters allowed.
-- External API caching: Two-tier pattern (memory + Parameter Store) with appropriate TTLs based on data mutability (30 days for VIN specs, shorter for recalls/prices).
+- **External API Caching Strategy (IMPORTANT - Updated Nov 16, 2025):**
+  - **Parameter Store: ONLY for secrets (/vwc/dev/secrets) and Auth0 token caching (/vwc/dev/auth0-token-cache)**
+  - **DO NOT use Parameter Store for external API response caching** (wrong use case, size limits, unnecessary complexity)
+  - **VIN decode (immutable):** Memory cache (Lambda container) → Store in MongoDB `vehicle.specs` (no expiration)
+  - **Safety data (mutable):** Memory cache (hot path) → Store in MongoDB `vehicle.safety` with TTL checking (7 days recalls, 30 days complaints)
+  - **Fuel economy (immutable):** Store in MongoDB `vehicle.fuelEconomy.epa` on first lookup (no expiration)
+  - **Cache tiers:** Memory (0-1ms, Lambda container) → MongoDB (10-20ms, persistent with TTL) → API (500ms+, fallback)
+  - **Rationale:** External APIs are free, data often too large for Parameter Store (4KB/32KB limits), MongoDB is better persistence layer
+  - **See:** `docs/external-api-caching-strategy.md` for complete analysis and `docs/job-jar-remove-parameter-store-caching.md` for migration plan
 - CHANGELOG same-day commits: Use unique descriptive titles for multiple same-day entries (e.g., [Feature Name] - YYYY-MM-DD) or add commit hash for uniqueness.
 
 FOLDER CREATION RULES:

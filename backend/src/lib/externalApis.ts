@@ -39,6 +39,40 @@ export interface VehicleSpecs {
   source: 'NHTSA_vPIC';
 }
 
+export interface RecallData {
+  manufacturer: string;
+  NHTSACampaignNumber: string;
+  reportReceivedDate: string;
+  component: string;
+  summary: string;
+  consequence: string;
+  remedy: string;
+  notes: string;
+  modelYear: string;
+  make: string;
+  model: string;
+}
+
+export interface ComplaintData {
+  odiNumber: number;
+  manufacturer: string;
+  crash: boolean;
+  fire: boolean;
+  numberOfInjuries: number;
+  numberOfDeaths: number;
+  dateOfIncident: string;
+  dateComplaintFiled: string;
+  vin: string;
+  components: string;
+  summary: string;
+}
+
+export interface SafetyData {
+  recalls: RecallData[];
+  complaints: ComplaintData[];
+  lastChecked: Date;
+}
+
 export interface Recall {
   campaignNumber: string;
   component: string;
@@ -196,6 +230,56 @@ interface VPICResponse {
 }
 
 // ============================================================================
+// NHTSA Recalls & Complaints API Client
+// ============================================================================
+
+interface RecallsAPIResponse {
+  Count: number;
+  Message: string;
+  results: Array<{
+    Manufacturer: string;
+    NHTSACampaignNumber: string;
+    parkIt: boolean;
+    parkOutSide: boolean;
+    overTheAirUpdate: boolean;
+    ReportReceivedDate: string;
+    Component: string;
+    Summary: string;
+    Consequence: string;
+    Remedy: string;
+    Notes: string;
+    ModelYear: string;
+    Make: string;
+    Model: string;
+  }>;
+}
+
+interface ComplaintsAPIResponse {
+  Count: number;
+  Message: string;
+  results: Array<{
+    odiNumber: number;
+    manufacturer: string;
+    crash: boolean;
+    fire: boolean;
+    numberOfInjuries: number;
+    numberOfDeaths: number;
+    dateOfIncident: string;
+    dateComplaintFiled: string;
+    vin: string;
+    components: string;
+    summary: string;
+    products: Array<{
+      type: string;
+      productYear: string;
+      productMake: string;
+      productModel: string;
+      manufacturer: string;
+    }>;
+  }>;
+}
+
+// ============================================================================
 // Vehicle Data Client (Main Class)
 // ============================================================================
 
@@ -283,17 +367,121 @@ export class VehicleDataClient {
   }
 
   /**
-   * Get vehicle recalls (Phase 2 - placeholder)
+   * Get vehicle recalls from NHTSA API
+   * Cache TTL: 7 days (recalls change occasionally)
    */
-  async getRecalls(params: {
-    vin?: string;
-    make?: string;
-    model?: string;
-    year?: number;
-  }): Promise<Recall[]> {
-    // TODO: Implement in Phase 2
-    console.log('[VehicleDataClient] getRecalls not yet implemented', params);
-    return [];
+  async getRecalls(
+    make: string,
+    model: string,
+    year: number
+  ): Promise<RecallData[]> {
+    const cacheKey = `recalls/${make}/${model}/${year}`;
+    const TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+
+    try {
+      return await this.cache.get(
+        cacheKey,
+        async () => {
+          const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(
+            make
+          )}&model=${encodeURIComponent(model)}&modelYear=${year}`;
+
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(
+              `NHTSA Recalls API returned ${response.status}: ${response.statusText}`
+            );
+          }
+
+          const data = (await response.json()) as RecallsAPIResponse;
+
+          if (!data.results) {
+            throw new Error('No results returned from NHTSA Recalls API');
+          }
+
+          // Map API response to our format
+          return data.results.map((recall) => ({
+            manufacturer: recall.Manufacturer,
+            NHTSACampaignNumber: recall.NHTSACampaignNumber,
+            reportReceivedDate: recall.ReportReceivedDate,
+            component: recall.Component,
+            summary: recall.Summary,
+            consequence: recall.Consequence,
+            remedy: recall.Remedy,
+            notes: recall.Notes,
+            modelYear: recall.ModelYear,
+            make: recall.Make,
+            model: recall.Model,
+          }));
+        },
+        TTL_SECONDS
+      );
+    } catch (error) {
+      throw new ExternalAPIError(
+        'NHTSA Recalls',
+        error as Error,
+        false // No fallback for recalls
+      );
+    }
+  }
+
+  /**
+   * Get vehicle complaints from NHTSA API
+   * Cache TTL: 30 days (complaints are historical data)
+   */
+  async getComplaints(
+    make: string,
+    model: string,
+    year: number
+  ): Promise<ComplaintData[]> {
+    const cacheKey = `complaints/${make}/${model}/${year}`;
+    const TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+    try {
+      return await this.cache.get(
+        cacheKey,
+        async () => {
+          const url = `https://api.nhtsa.gov/complaints/complaintsByVehicle?make=${encodeURIComponent(
+            make
+          )}&model=${encodeURIComponent(model)}&modelYear=${year}`;
+
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(
+              `NHTSA Complaints API returned ${response.status}: ${response.statusText}`
+            );
+          }
+
+          const data = (await response.json()) as ComplaintsAPIResponse;
+
+          if (!data.results) {
+            throw new Error('No results returned from NHTSA Complaints API');
+          }
+
+          // Map API response to our format
+          return data.results.map((complaint) => ({
+            odiNumber: complaint.odiNumber,
+            manufacturer: complaint.manufacturer,
+            crash: complaint.crash,
+            fire: complaint.fire,
+            numberOfInjuries: complaint.numberOfInjuries,
+            numberOfDeaths: complaint.numberOfDeaths,
+            dateOfIncident: complaint.dateOfIncident,
+            dateComplaintFiled: complaint.dateComplaintFiled,
+            vin: complaint.vin,
+            components: complaint.components,
+            summary: complaint.summary,
+          }));
+        },
+        TTL_SECONDS
+      );
+    } catch (error) {
+      throw new ExternalAPIError(
+        'NHTSA Complaints',
+        error as Error,
+        false // No fallback for complaints
+      );
+    }
   }
 
   /**
