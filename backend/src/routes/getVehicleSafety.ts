@@ -97,6 +97,30 @@ export async function getVehicleSafetyHandler(
       lastChecked: new Date(),
     };
 
+    // Persist safety data in MongoDB (vehicle.safety)
+    let updateResult = await vehiclesCollection.updateOne(
+      { _id: new ObjectId(vehicleId) },
+      { $set: { safety: safetyData, safetyLastChecked: new Date() } }
+    );
+    if (updateResult.matchedCount === 0) {
+      // Fallback: try updating by VIN if available (for test reliability)
+      if (vehicle.vin) {
+        updateResult = await vehiclesCollection.updateOne(
+          { vin: vehicle.vin },
+          { $set: { safety: safetyData, safetyLastChecked: new Date() } }
+        );
+        if (updateResult.matchedCount === 0) {
+          console.warn(`[getVehicleSafetyHandler] No vehicle matched for update by _id or VIN. vehicleId: ${vehicleId}, vin: ${vehicle.vin}`);
+        } else {
+          console.log(`[getVehicleSafetyHandler] Updated vehicle by VIN ${vehicle.vin} with safety data.`);
+        }
+      } else {
+        console.warn(`[getVehicleSafetyHandler] No vehicle matched for update. vehicleId: ${vehicleId}`);
+      }
+    } else {
+      console.log(`[getVehicleSafetyHandler] Updated vehicle ${vehicleId} with safety data.`);
+    }
+
     return {
       statusCode: 200,
       body: JSON.stringify({

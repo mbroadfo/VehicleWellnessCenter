@@ -3,7 +3,6 @@
  * Handles all third-party vehicle data integrations
  */
 
-import { getParameter, putParameter } from './parameterStore.js';
 import { memoryCache } from './cache.js';
 
 // ============================================================================
@@ -99,78 +98,8 @@ export interface FuelEconomyData {
 // Caching Infrastructure
 // ============================================================================
 
-interface CachedData<T> {
-  data: T;
-  expiresAt: number;
-}
 
-class DataCache {
-  private memoryCache = new Map<string, CachedData<unknown>>();
 
-  /**
-   * JSON reviver to deserialize Date objects from ISO strings
-   */
-  private dateReviver(_key: string, value: unknown): unknown {
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-      return new Date(value);
-    }
-    return value;
-  }
-
-  async get<T>(
-    key: string,
-    fetcher: () => Promise<T>,
-    ttlSeconds: number
-  ): Promise<T> {
-    // Check memory cache first (0-1ms)
-    const cached = this.memoryCache.get(key) as CachedData<T> | undefined;
-    if (cached && cached.expiresAt > Date.now()) {
-      console.log(`[Cache HIT] Memory: ${key}`);
-      return cached.data;
-    }
-
-    // Check Parameter Store cache (50-100ms)
-    try {
-      const paramValue = await getParameter(`/vwc/cache/${key}`);
-      const storedData = JSON.parse(paramValue, this.dateReviver.bind(this)) as CachedData<T>;
-
-      // Refresh memory cache
-      this.memoryCache.set(key, storedData);
-
-      if (storedData.expiresAt > Date.now()) {
-        console.log(`[Cache HIT] Parameter Store: ${key}`);
-        return storedData.data;
-      }
-    } catch {
-      // Cache miss or expired - fetch fresh data
-      console.log(`[Cache MISS] ${key}`);
-    }
-
-    // Fetch from external API (500-2000ms)
-    console.log(`[API CALL] Fetching fresh data for: ${key}`);
-    const freshData = await fetcher();
-    const cacheEntry: CachedData<T> = {
-      data: freshData,
-      expiresAt: Date.now() + ttlSeconds * 1000,
-    };
-
-    // Store in both caches
-    this.memoryCache.set(key, cacheEntry);
-
-    // Store in Parameter Store (async, don't wait)
-    putParameter(`/vwc/cache/${key}`, JSON.stringify(cacheEntry)).catch(
-      (err: unknown) => {
-        console.error(`[Cache WRITE FAILED] Parameter Store: ${key}`, err);
-      }
-    );
-
-    return freshData;
-  }
-
-  clear() {
-    this.memoryCache.clear();
-  }
-}
 
 // ============================================================================
 // External API Error Handling
@@ -285,7 +214,7 @@ interface ComplaintsAPIResponse {
 // ============================================================================
 
 export class VehicleDataClient {
-  private cache = new DataCache();
+  // DataCache removed; use memoryCache directly
 
   /**
    * Decode VIN using NHTSA vPIC API
@@ -521,7 +450,7 @@ export class VehicleDataClient {
    * Clear all caches (for testing)
    */
   clearCache() {
-    this.cache.clear();
+    memoryCache.clear();
   }
 }
 

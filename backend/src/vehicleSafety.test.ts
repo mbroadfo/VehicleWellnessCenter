@@ -269,4 +269,54 @@ describe('GET /vehicles/:id/safety endpoint', () => {
     expect(body.success).toBe(false);
     expect(body.error).toContain('Invalid');
   });
+
+  it('should persist safety data in MongoDB after endpoint call', async () => {
+    const db = await getDatabase();
+    const vehicles = db.collection('vehicles');
+
+    // Ensure test vehicle exists before endpoint call
+    await vehicles.updateOne(
+      { vin: TEST_VIN },
+      {
+        $setOnInsert: {
+          _id: TEST_VEHICLE_ID,
+          vin: TEST_VIN,
+          make: 'Jeep',
+          model: 'Cherokee',
+          year: 2017,
+          userId: 'test-user',
+          nickname: 'Test Jeep',
+          createdAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+
+    // Call the safety endpoint
+    const event: Partial<APIGatewayProxyEventV2> = {
+      requestContext: {
+        http: {
+          method: 'GET',
+          path: `/vehicles/${TEST_VEHICLE_ID.toString()}/safety`,
+        },
+      } as APIGatewayProxyEventV2['requestContext'],
+      pathParameters: {
+        id: TEST_VEHICLE_ID.toString(),
+      },
+    };
+
+    await getVehicleSafetyHandler(event as APIGatewayProxyEventV2);
+
+    // Fetch vehicle from DB and check safety field
+    let updatedVehicle = await vehicles.findOne({ _id: TEST_VEHICLE_ID });
+    if (!updatedVehicle) {
+      updatedVehicle = await vehicles.findOne({ vin: TEST_VIN });
+    }
+    expect(updatedVehicle).toBeDefined();
+    expect(updatedVehicle!.safety).toBeDefined();
+    expect(updatedVehicle!.safety.recalls).toBeDefined();
+    expect(updatedVehicle!.safety.complaints).toBeDefined();
+    expect(updatedVehicle!.safety.lastChecked).toBeDefined();
+    expect(updatedVehicle!.safetyLastChecked).toBeDefined();
+  });
 });

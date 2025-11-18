@@ -132,9 +132,9 @@ describe('Enrich Vehicle Endpoint', () => {
 
     // Decode VIN
     const specs = await vehicleDataClient.decodeVIN(vehicle!.vin);
-    expect(specs).toBeDefined();
-    expect(specs!.engine).toBeDefined();
-    expect(specs!.body).toBeDefined();
+  expect(specs).toBeDefined();
+  expect(specs.engine).toBeDefined();
+  expect(specs.body).toBeDefined();
 
     // Update vehicle with specs
     await vehiclesCollection.updateOne(
