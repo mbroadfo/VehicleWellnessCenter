@@ -22,8 +22,8 @@ export async function enrichVehicleHandler(
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> {
   try {
-    // Extract vehicle ID from path
-    const vehicleId = event.pathParameters?.id;
+    // Extract vehicle ID from path (API Gateway v2 uses {vehicleId} in route)
+    const vehicleId = event.pathParameters?.vehicleId || event.pathParameters?.id;
     if (!vehicleId) {
       return {
         statusCode: 400,

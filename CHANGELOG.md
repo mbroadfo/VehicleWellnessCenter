@@ -4,9 +4,48 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Phase 9 - Real Vehicle Validation] - 2025-11-17
+
+### Added
+
+- **Infrastructure**: API Gateway routes for vehicle enrichment and safety endpoints
+  - `POST /vehicles/{vehicleId}/enrich` - VIN decode and specification storage
+  - `GET /vehicles/{vehicleId}/safety` - Recalls and complaints retrieval
+- **Backend**: Real vehicle testing utilities in `backend/tests/` directory
+  - `test-real-vehicle.ts` - End-to-end enrichment and safety data validation
+  - `test-vin-report.ts` - Comprehensive VIN-based report generator
+  - `test-endpoints.ts` - Quick API endpoint validation
+  - `debug-structure.ts` - MongoDB document structure inspector
+
+### Changed - Route Handlers
+
+- **Backend**: Fixed path parameter handling in route handlers
+  - `enrichVehicleHandler` now accepts `vehicleId` or `id` from path parameters
+  - `getVehicleSafetyHandler` now accepts `vehicleId` or `id` from path parameters
+  - Ensures compatibility with API Gateway v2 route parameter naming
+- **Backend**: Moved test utilities from `src/` to `tests/` directory
+  - Resolves TypeScript compilation errors from utility scripts
+  - Separates development/test tooling from production Lambda code
+
+### Validated
+
+- **Real Vehicle**: 2017 Jeep Cherokee (VIN: 1C4PJMBS9HW664582)
+  - ✅ VIN decode successful: 3.2L V6, 271 HP, 4-door SUV
+  - ✅ Safety data: 6 active recalls, 1,249 complaints retrieved
+  - ✅ Memory cache working: MISS (first call), HIT (subsequent calls, 0-1ms)
+  - ✅ MongoDB persistence: Specs and safety data stored with proper TTL tracking
+  - ✅ External API integration: NHTSA vPIC, Recalls API, Complaints API all functional
+
+### Infrastructure
+
+- **Terraform**: Added API Gateway v2 routes for enrich and safety endpoints
+- **IAM**: CloudWatch logs filtering permission added to terraform-vwc policy
+- **Lambda**: Deployed with enrich and safety route handlers (5.16 MB package)
+
 ## [Phase 2 - Safety Intelligence - DataCache Removal] - 2025-11-17
 
-### Changed
+### Changed - DataCache Removal
+
 - **Backend**: Refactored safety endpoint (`getVehicleSafetyHandler`) to use memoryCache and persist safety data in MongoDB
   - Added fallback update by VIN for test reliability
   - Safety data now stored in `vehicle.safety` with `lastChecked` timestamp
@@ -20,11 +59,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Tests verify memory cache behavior and MongoDB document updates
 
 ### Fixed
+
 - Safety data persistence issue for test vehicles resolved by fallback update logic in handler
 - Test reliability improved for safety endpoint and caching operations
 - Eliminated Parameter Store size limit errors (4KB/32KB) by removing external API caching
 
 ### Documentation
+
 - Updated `backend/README.md` to reflect memory cache + MongoDB persistence strategy
 - Updated `docs/job-jar-remove-parameter-store-caching.md` status (Phases 1-6 completed)
 - Confirmed all documentation current with new caching strategy
@@ -174,7 +215,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Converts to proper Date objects (fixes `decodedAt` returning string instead of Date)
 - **Test Reliability**: Added `clearCache()` call in cache timing test to ensure fresh API call on first run
 
-### Changed
+### Changed - Router & Tests
 
 - **Backend**: Lambda router updated
   - Imported `enrichVehicleHandler` in `src/index.ts`

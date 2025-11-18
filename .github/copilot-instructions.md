@@ -127,6 +127,9 @@ DEVELOPMENT RULES:
 - Test vehicle persistence pattern: When updating test vehicles by _id fails, fallback to VIN-based update for test reliability (safety endpoint pattern).
 - MongoDB persistence after external API calls: Always store fetched data in MongoDB for future TTL-based retrieval (specs, safety data).
 - CHANGELOG same-day commits: Use unique descriptive titles for multiple same-day entries (e.g., [Feature Name] - YYYY-MM-DD) or add commit hash for uniqueness.
+- **API Gateway v2 path parameters:** Route parameter names in Terraform must match handler expectations - handlers should accept both `vehicleId` and `id` for compatibility.
+- **External API test timeouts:** NHTSA and other external APIs can be slow - set test timeouts to 15+ seconds for reliability (e.g., `it('test', async () => {...}, 15000)`).
+- **Markdown linting in CHANGELOG:** Duplicate heading disambiguation - rename plain headings like `### Changed` to `### Changed - <Context>` for uniqueness (fixes MD024).
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.

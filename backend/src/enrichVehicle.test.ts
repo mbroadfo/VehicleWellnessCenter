@@ -60,7 +60,7 @@ describe('NHTSA vPIC API Client', () => {
     expect(specs.engine.cylinders).toBeGreaterThan(0);
     expect(specs.body.type).toBeDefined();
     expect(specs.body.type).not.toBe('Unknown');
-  }, 10000); // Allow 10s for API call
+  }, 15000); // Allow 15s for API call (external API can be slow)
 
   it('should handle invalid VIN gracefully', async () => {
     const invalidVin = '00000000000000000'; // Valid format but invalid data
