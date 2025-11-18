@@ -1,7 +1,9 @@
 import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { getSecrets } from "../lib/mongodb";
+import { ObjectId } from "mongodb";
+import { getSecrets, getDatabase } from "../lib/mongodb";
 import { getAuth0Token } from "../lib/auth0";
+import type { ConversationMessage, ConversationSession, ChatRequest, ChatResponse } from "../lib/conversationTypes.js";
 
 /**
  * AI Chat Handler - Data Curator Pattern
@@ -17,17 +19,7 @@ import { getAuth0Token } from "../lib/auth0";
  * alongside your other handlers in the same Lambda, sharing code and connection pools.
  */
 
-interface ChatRequest {
-  message: string;
-  vehicleId?: string;
-  conversationHistory?: Array<{ role: string; content: string }>;
-}
-
-interface ChatResponse {
-  message: string;
-  toolsUsed?: string[];
-  error?: string;
-}
+// ChatRequest and ChatResponse now imported from conversationTypes.ts
 
 // Function declarations that tell Gemini about our existing CRUD endpoints
 const FUNCTION_DECLARATIONS = [
@@ -345,6 +337,86 @@ export const handler = async (
       };
     }
 
+    // Extract userId from JWT claims (API Gateway v2 authorizer context)
+    const userId = (event.requestContext as any).authorizer?.jwt?.claims?.sub as string;
+    if (!userId) {
+      return {
+        statusCode: 401,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "Unauthorized: missing user ID" })
+      };
+    }
+
+    // Get MongoDB connection
+    const db = await getDatabase();
+    const sessionsCollection = db.collection<ConversationSession>('conversation_sessions');
+    const messagesCollection = db.collection<ConversationMessage>('conversation_messages');
+
+    // Determine session ID (create new or use existing)
+    let sessionId: ObjectId;
+    let isNewSession = false;
+
+    if (request.sessionId) {
+      // Validate existing session ID
+      if (!ObjectId.isValid(request.sessionId)) {
+        return {
+          statusCode: 400,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ error: "Invalid session ID format" })
+        };
+      }
+      sessionId = new ObjectId(request.sessionId);
+
+      // Verify session exists and belongs to user
+      const existingSession = await sessionsCollection.findOne({ _id: sessionId, userId });
+      if (!existingSession) {
+        return {
+          statusCode: 404,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ error: "Session not found or access denied" })
+        };
+      }
+    } else {
+      // Create new session
+      sessionId = new ObjectId();
+      isNewSession = true;
+
+      const newSession: ConversationSession = {
+        _id: sessionId,
+        userId,
+        vehicleId: request.vehicleId ? new ObjectId(request.vehicleId) : null,
+        createdAt: new Date(),
+        lastActiveAt: new Date(),
+        messageCount: 0,
+        title: null // Will be set from first message
+      };
+
+      await sessionsCollection.insertOne(newSession);
+      console.log(`Created new conversation session: ${sessionId.toString()}`);
+    }
+
+    // Load conversation history from MongoDB (last 20 messages)
+    const conversationHistory = await messagesCollection
+      .find({ sessionId })
+      .sort({ timestamp: 1 })
+      .limit(20)
+      .toArray();
+
+    console.log(`Loaded ${conversationHistory.length} messages from session ${sessionId.toString()}`);
+
+    // Persist user message to MongoDB
+    const userMessageDoc: ConversationMessage = {
+      sessionId,
+      userId,
+      vehicleId: request.vehicleId ? new ObjectId(request.vehicleId) : null,
+      role: 'user',
+      content: request.message,
+      timestamp: new Date()
+    };
+
+    await messagesCollection.insertOne(userMessageDoc);
+    console.log(`Persisted user message to session ${sessionId.toString()}`);
+
     // Get secrets (includes GOOGLE_API_KEY)
     const secrets = await getSecrets();
     const googleApiKey = (secrets as unknown as Record<string, string>).GOOGLE_API_KEY;
@@ -371,12 +443,15 @@ export const handler = async (
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS as any }]
     });
 
-    // Start chat session
+    // Build history for Gemini from MongoDB messages
+    const geminiHistory = conversationHistory.map(msg => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }]
+    }));
+
+    // Start chat session with history
     const chat = model.startChat({
-      history: request.conversationHistory?.map(msg => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content }]
-      })) || []
+      history: geminiHistory
     });
 
     // Build context with vehicleId if provided
@@ -432,9 +507,46 @@ export const handler = async (
     // Extract final response text
     const responseText = result.response.text();
 
+    // Persist AI response to MongoDB
+    const assistantMessageDoc: ConversationMessage = {
+      sessionId,
+      userId,
+      vehicleId: request.vehicleId ? new ObjectId(request.vehicleId) : null,
+      role: 'assistant',
+      content: responseText,
+      toolsUsed: toolsUsed.length > 0 ? toolsUsed : null,
+      timestamp: new Date()
+    };
+
+    await messagesCollection.insertOne(assistantMessageDoc);
+    console.log(`Persisted assistant response to session ${sessionId.toString()}`);
+
+    // Update session metadata
+    const updateSession: Partial<ConversationSession> = {
+      lastActiveAt: new Date(),
+      messageCount: conversationHistory.length + 2 // +2 for user + assistant messages just added
+    };
+
+    // Set title from first user message (if new session)
+    if (isNewSession) {
+      // Generate simple title from first message (first 50 chars)
+      updateSession.title = request.message.substring(0, 50) + (request.message.length > 50 ? '...' : '');
+    }
+
+    await sessionsCollection.updateOne(
+      { _id: sessionId },
+      { $set: updateSession }
+    );
+
     const response: ChatResponse = {
+      success: true,
+      sessionId: sessionId.toString(),
       message: responseText,
-      toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
+      toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
+      conversationContext: {
+        messageCount: updateSession.messageCount || 0,
+        historyUsed: conversationHistory.length
+      }
     };
 
     return {

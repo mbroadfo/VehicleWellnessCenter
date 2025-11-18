@@ -707,6 +707,14 @@ resource "aws_apigatewayv2_route" "get_vehicle_safety" {
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
+resource "aws_apigatewayv2_route" "get_conversation_messages" {
+  api_id             = aws_apigatewayv2_api.vwc_api.id
+  route_key          = "GET /conversations/{sessionId}/messages"
+  target             = "integrations/${aws_apigatewayv2_integration.vwc.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+}
+
 # ============================================================================
 # Outputs
 # ============================================================================

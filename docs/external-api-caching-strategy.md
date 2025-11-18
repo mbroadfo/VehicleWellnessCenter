@@ -24,9 +24,9 @@ Our application integrates with multiple external APIs providing vehicle data. E
 
 ### Planned (Phase 3-6)
 
-4. **EPA FuelEconomy.gov** - Fuel economy ratings
-5. **NHTSA Crash Ratings** - NCAP safety scores
-6. **NHTSA Investigations** - Ongoing safety investigations
+1. **EPA FuelEconomy.gov** - Fuel economy ratings
+2. **NHTSA Crash Ratings** - NCAP safety scores
+3. **NHTSA Investigations** - Ongoing safety investigations
 
 ---
 
@@ -49,12 +49,14 @@ Our application integrates with multiple external APIs providing vehicle data. E
 ### Tier 1: MongoDB Storage (Primary Persistence)
 
 **Use for:**
+
 - Data that enriches vehicle records (specs, safety scores, fuel economy)
 - Data that users expect to persist (recalls, investigations)
 - Data too large for Parameter Store (>4KB)
 - Mutable data with reasonable TTL (7-30 days)
 
 **Implementation:**
+
 ```typescript
 // Vehicle document with cached external data
 {

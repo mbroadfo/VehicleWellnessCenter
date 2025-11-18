@@ -133,6 +133,103 @@ async function initializeCollections(): Promise<void> {
       console.log("Collection already exists: vehicleEvents");
     }
 
+    // Create conversation_sessions collection
+    const conversationSessionsCollection = {
+      name: "conversation_sessions",
+      validator: {
+        $jsonSchema: {
+          bsonType: "object",
+          required: ["userId", "createdAt", "lastActiveAt"],
+          properties: {
+            userId: { bsonType: "string", description: "Auth0 user identifier" },
+            vehicleId: { bsonType: ["objectId", "null"], description: "Optional vehicle context" },
+            createdAt: { bsonType: "date", description: "Session creation timestamp" },
+            lastActiveAt: { bsonType: "date", description: "Last message timestamp (for TTL)" },
+            messageCount: { bsonType: "int", description: "Total messages in session" },
+            title: { bsonType: ["string", "null"], description: "Generated from first message" }
+          }
+        }
+      },
+      validationAction: "warn"
+    };
+
+    if (!collectionNames.includes("conversation_sessions")) {
+      console.log("Creating collection: conversation_sessions");
+      await db.createCollection("conversation_sessions", { 
+        validator: conversationSessionsCollection.validator, 
+        validationAction: conversationSessionsCollection.validationAction 
+      });
+      
+      // Create TTL index (auto-delete inactive sessions after 90 days)
+      console.log("Creating TTL index: ttl_inactive_sessions (90 days)");
+      await db.collection("conversation_sessions").createIndex(
+        { lastActiveAt: 1 }, 
+        { name: "ttl_inactive_sessions", expireAfterSeconds: 7776000 } // 90 days
+      );
+      
+      // Create lookup index
+      console.log("Creating index: ix_user_sessions");
+      await db.collection("conversation_sessions").createIndex({ userId: 1, lastActiveAt: -1 }, { name: "ix_user_sessions" });
+    } else {
+      console.log("Collection already exists: conversation_sessions");
+    }
+
+    // Create conversation_messages collection
+    const conversationMessagesCollection = {
+      name: "conversation_messages",
+      validator: {
+        $jsonSchema: {
+          bsonType: "object",
+          required: ["sessionId", "userId", "role", "content", "timestamp"],
+          properties: {
+            sessionId: { bsonType: "objectId", description: "Reference to conversation_sessions._id" },
+            userId: { bsonType: "string", description: "Auth0 user identifier" },
+            vehicleId: { bsonType: ["objectId", "null"], description: "Optional vehicle context" },
+            role: { enum: ["user", "assistant"], description: "Message sender role" },
+            content: { bsonType: "string", description: "Message text content" },
+            toolsUsed: { 
+              bsonType: ["array", "null"], 
+              items: { bsonType: "string" },
+              description: "Functions called by AI (if assistant role)"
+            },
+            timestamp: { bsonType: "date", description: "Message creation timestamp (for TTL)" }
+          }
+        }
+      },
+      validationAction: "warn"
+    };
+
+    if (!collectionNames.includes("conversation_messages")) {
+      console.log("Creating collection: conversation_messages");
+      await db.createCollection("conversation_messages", { 
+        validator: conversationMessagesCollection.validator, 
+        validationAction: conversationMessagesCollection.validationAction 
+      });
+      
+      // Create TTL index (auto-delete messages after 30 days)
+      console.log("Creating TTL index: ttl_message_expiry (30 days)");
+      await db.collection("conversation_messages").createIndex(
+        { timestamp: 1 }, 
+        { name: "ttl_message_expiry", expireAfterSeconds: 2592000 } // 30 days
+      );
+      
+      // Create session lookup index
+      console.log("Creating index: ix_session_messages");
+      await db.collection("conversation_messages").createIndex(
+        { sessionId: 1, timestamp: 1 }, 
+        { name: "ix_session_messages" }
+      );
+      
+      // Create user lookup index
+      console.log("Creating index: ix_user_messages");
+      await db.collection("conversation_messages").createIndex(
+        { userId: 1, timestamp: -1 }, 
+        { name: "ix_user_messages" }
+      );
+    } else {
+      console.log("Collection already exists: conversation_messages");
+    }
+
     console.log("\n✅ Collection initialization completed successfully!");
 
     // Verify collections were created
