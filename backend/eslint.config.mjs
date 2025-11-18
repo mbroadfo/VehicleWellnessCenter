@@ -4,7 +4,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 
 export default [
   {
-    ignores: ["dist/**", "vitest.config.ts"]
+    ignores: ["dist/**", "vitest.config.ts", "tests/**"]
   },
   {
     files: ["**/*.ts"],

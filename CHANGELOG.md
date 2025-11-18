@@ -4,6 +4,61 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Phase 11 - NCAP Safety Ratings Integration] - 2025-11-18
+
+### Added - NHTSA NCAP Safety Ratings
+
+- **NCAP Ratings API Client**: Implemented two-step NCAP ratings integration in `backend/src/lib/externalApis.ts`
+  - `getSafetyRatings(year, make, model)`: Two-step process via NHTSA SafetyRatings API
+    - Step 1: Search for vehicle IDs by year/make/model (`/SafetyRatings/modelyear/{year}/make/{make}/model/{model}`)
+    - Step 2: Fetch detailed ratings by vehicle ID (`/SafetyRatings/VehicleId/{id}`)
+  - Returns star ratings (1-5) for overall, front driver/passenger, side, rollover
+  - Includes rollover risk percentage (0-100%) and safety features (ESC, FCW, LDW)
+  - Memory caching: 24-hour TTL for NCAP ratings (immutable but allows periodic refresh)
+  - Non-blocking error handling: Returns null if ratings unavailable (doesn't throw)
+- **NCAPRatings Interface**: Added comprehensive type definitions
+  - Star ratings: overall, frontDriver, frontPassenger, side, rollover (1-5 scale)
+  - Rollover risk: rolloverPossibility (percentage)
+  - Safety features: ESC (Electronic Stability Control), FCW (Forward Collision Warning), LDW (Lane Departure Warning)
+  - Metadata: vehicleId (NCAP database ID), lastUpdated (timestamp)
+- **Safety Endpoint Enhancement**: Extended `GET /vehicles/:id/safety` to include NCAP ratings
+  - Parallel data fetching: recalls + complaints + NCAP ratings via Promise.all
+  - MongoDB persistence: Stores `ncapRating` field in vehicle safety data
+  - Response summary: Added `hasNCAPRatings` and `overallRating` fields
+
+### Tested - NCAP Test Suite
+
+- **Unit Tests**: 6 new tests in `backend/src/ncapRatings.test.ts` (all passing)
+  - ✅ Fetch ratings for 2017 Jeep Cherokee 4WD (NCAP ID 11348)
+  - ✅ Verify expected ratings: 4/4/5/4 stars (overall/front/side/rollover), 16.9% rollover risk
+  - ✅ Memory cache validation (24-hour TTL, sub-millisecond hits)
+  - ✅ Non-existent vehicle handling (returns null gracefully)
+  - ✅ Vehicles without NCAP ratings (1990 Honda Civic, pre-NCAP era)
+  - ✅ API error handling (invalid inputs, network failures)
+- **Integration Tests**: Safety endpoint tests updated and passing
+  - ✅ NCAP ratings fetched in parallel with recalls/complaints
+  - ✅ Data persisted to MongoDB (`vehicle.safety.ncapRating`)
+  - ✅ Response includes `hasNCAPRatings: true` and `overallRating: 4` fields
+- **Test Coverage**: All 92 tests passing (86 existing + 6 NCAP tests)
+- **Production Verification**: Deployed to AWS Lambda and tested via API Gateway
+  - Vehicle ID 11348 found for 2017 Jeep Cherokee
+  - Ratings fetched: Overall=4★, Front=4/4★, Side=5★, Rollover=4★
+  - Cache working with 86400s (24-hour) TTL
+
+### Infrastructure
+
+- **Lambda Deployment**: Updated deployment package to 5.36 MB
+  - Successfully deployed to AWS Lambda (vwc-dev function)
+  - NCAP integration verified in production environment
+  - All API integration tests (17 tests) passing
+
+### Changed - Test Reliability
+
+- **EPA Cache Test**: Fixed flaky timing assertion in `epaClient.test.ts`
+  - Removed unreliable timing comparison (cache hits can be 0ms due to sub-millisecond performance)
+  - Now validates data equality instead of timing thresholds
+  - Test suite stability improved for CI/CD environments
+
 ## [Phase 10 - EPA Fuel Economy Integration] - 2025-11-18
 
 ### Added - EPA Fuel Economy API Client

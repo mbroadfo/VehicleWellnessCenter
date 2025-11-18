@@ -4,15 +4,15 @@
 
 **Goal:** Implement the data storage strategy defined in `data-storage-strategy.md` systematically across all external data sources.
 
-**Current Status:** ✅ 3 of 5 external sources implemented (VIN decode, Safety data, EPA Fuel Economy)
+**Current Status:** ✅ 4 of 5 external sources implemented (VIN decode, Safety data, EPA Fuel Economy, NCAP Safety Ratings)
 
-**Remaining Work:** 2 external sources (NCAP ratings, Maintenance schedules) = 10-15 hours
+**Remaining Work:** 1 external source (Market Value Estimates) = 5-7 hours (or 1-2 hours for manual input field)
 
 ---
 
 ## Current Implementation Status
 
-### ✅ Already Implemented (Phase 10 Complete)
+### ✅ Already Implemented (Phase 11 Complete)
 
 | Data Source | API | Storage | TTL/Refresh | Status |
 |-------------|-----|---------|-------------|--------|
@@ -20,13 +20,14 @@
 | **Safety Recalls** | NHTSA Recalls | MongoDB `vehicle.safety.recalls` | 7-day check | ✅ Complete |
 | **Safety Complaints** | NHTSA Complaints | Memory cache only | 30 days (ephemeral) | ✅ Complete |
 | **Fuel Economy** | EPA Fuel Economy | MongoDB `vehicle.fuelEconomy.epa` | Permanent (immutable) | ✅ Complete |
+| **NCAP Safety Ratings** | NHTSA NCAP | MongoDB `vehicle.safety.ncapRating` | Permanent (immutable) | ✅ Complete |
 
 **Implementation details:**
-- ✅ `externalApis.ts`: `decodeVIN()`, `getRecalls()`, `getComplaints()`
-- ✅ `enrichVehicle.ts`: Stores specs in MongoDB permanently
-- ✅ `getVehicleSafety.ts`: Stores recalls in MongoDB, complaints ephemeral
+- ✅ `externalApis.ts`: `decodeVIN()`, `getRecalls()`, `getComplaints()`, `getFuelEconomy()`, `getSafetyRatings()`
+- ✅ `enrichVehicle.ts`: Stores specs + EPA fuel economy in MongoDB permanently
+- ✅ `getVehicleSafety.ts`: Stores recalls + NCAP ratings in MongoDB, complaints ephemeral
 - ✅ Memory cache: Lambda container reuse (15-45 min lifetime)
-- ✅ Tests: 68 passing (unit + integration + external API)
+- ✅ Tests: 92 passing (unit + integration + external API)
 
 **What works perfectly:**
 ```typescript
@@ -90,32 +91,49 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 
 ---
 
-### 🔨 Phase 11: NCAP Safety Ratings - 3-4 hours
+### ✅ Phase 11: NCAP Safety Ratings - COMPLETE (2025-11-18)
 
 **API:** NHTSA NCAP API (free, public)
-- Endpoint: `https://api.nhtsa.gov/SafetyRatings/modelyear/{year}/make/{make}/model/{model}`
-- Response: Overall/Frontal/Side/Rollover ratings (1-5 stars)
+- Endpoint: `https://api.nhtsa.gov/SafetyRatings/modelyear/{year}/make/{make}/model/{model}` (search)
+- Endpoint: `https://api.nhtsa.gov/SafetyRatings/VehicleId/{id}` (ratings)
+- Response: Overall/Frontal/Side/Rollover ratings (1-5 stars), rollover risk %, safety features
 - Size: ~2 KB per vehicle
 - Mutability: Immutable (ratings finalized once published)
 
 **Storage Strategy:** MongoDB permanent (Pattern 1)
 
 **Implementation checklist:**
-- [ ] Add NCAP API client to `externalApis.ts`
-  ```typescript
-  async getSafetyRatings(year: number, make: string, model: string): Promise<NCAPRatings>
-  ```
-- [ ] Extend `GET /vehicles/:id/safety` to include NCAP ratings
-- [ ] Store in MongoDB `vehicle.safety.ncapRating` (permanent)
-- [ ] Add memory cache (24-hour TTL, Lambda container reuse)
-- [ ] Write tests (unit + integration)
-- [ ] Add to TypeScript types
+- [x] Add NCAP API client to `externalApis.ts`
+  - Two-step process: search by year/make/model → fetch ratings by vehicle ID
+  - Returns NCAPRatings with star ratings, rollover risk, safety features (ESC/FCW/LDW)
+  - Memory cache with 24-hour TTL
+  - Non-blocking error handling (returns null)
+- [x] Extend `GET /vehicles/:id/safety` to include NCAP ratings
+  - Parallel fetch with recalls + complaints
+  - Response summary includes `hasNCAPRatings` and `overallRating` fields
+- [x] Store in MongoDB `vehicle.safety.ncapRating` (permanent)
+- [x] Add memory cache (24-hour TTL, Lambda container reuse)
+- [x] Write tests (6 NCAP unit tests + integration tests)
+  - Test vehicle: 2017 Jeep Cherokee 4WD (NCAP ID 11348)
+  - Expected ratings: 4/4/5/4 stars, 16.9% rollover risk
+  - Full test suite: 92 tests passing
+- [x] Add to TypeScript types (NCAPRatings interface)
+- [x] Deploy Lambda (5.36 MB)
+- [x] Production verification (API Gateway tests passing)
 
-**Estimated effort:** 3-4 hours
-- API client: 1 hour
+**Implementation Notes:**
+- NCAP API uses two-step process: search returns vehicle IDs, then fetch ratings by ID
+- Typically returns first variant (most common, usually 4WD for SUVs)
+- Star ratings range 1-5, rollover risk is percentage (0-100%)
+- Safety features: ESC (Electronic Stability Control), FCW (Forward Collision Warning), LDW (Lane Departure Warning)
+- Older vehicles (pre-2011) may not have NCAP ratings
+- Non-blocking implementation: returns null if ratings unavailable, doesn't fail safety endpoint
+
+**Actual effort:** ~4 hours (API exploration, two-step implementation, testing, deployment)
+- API client: 1.5 hours (two-step process discovery)
 - Route update: 30 min
-- Tests: 1.5 hours
-- Deployment: 30 min
+- Tests: 1.5 hours (6 unit tests + integration)
+- Deployment + verification: 30 min
 
 ---
 

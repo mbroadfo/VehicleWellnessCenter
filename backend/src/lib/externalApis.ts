@@ -106,6 +106,22 @@ export interface EPAVehicleMatch {
   description: string; // e.g., "Auto 9-spd, 6 cyl, 3.2 L"
 }
 
+export interface NCAPRatings {
+  overall: number; // 1-5 stars
+  frontDriver: number;
+  frontPassenger: number;
+  side: number;
+  rollover: number;
+  rolloverPossibility: number; // Percentage (0-100)
+  features: {
+    electronicStabilityControl: string; // "Standard" | "Optional" | "Not Available"
+    forwardCollisionWarning: string;
+    laneDepartureWarning: string;
+  };
+  vehicleId: number; // NHTSA vehicle ID
+  lastUpdated: Date;
+}
+
 // ============================================================================
 // Caching Infrastructure
 // ============================================================================
@@ -218,6 +234,38 @@ interface ComplaintsAPIResponse {
       productModel: string;
       manufacturer: string;
     }>;
+  }>;
+}
+
+// ============================================================================
+// NHTSA NCAP Safety Ratings API Client
+// ============================================================================
+
+interface NCAPVehicleSearchResponse {
+  Count: number;
+  Message: string;
+  Results: Array<{
+    VehicleDescription: string;
+    VehicleId: number;
+  }>;
+}
+
+interface NCAPRatingsResponse {
+  Count: number;
+  Message: string;
+  Results: Array<{
+    OverallRating: string;
+    OverallFrontCrashRating: string;
+    FrontCrashDriversideRating: string;
+    FrontCrashPassengersideRating: string;
+    OverallSideCrashRating: string;
+    RolloverRating: string;
+    RolloverPossibility: number;
+    NHTSAElectronicStabilityControl: string;
+    NHTSAForwardCollisionWarning: string;
+    NHTSALaneDepartureWarning: string;
+    VehicleId: number;
+    VehicleDescription: string;
   }>;
 }
 
@@ -444,6 +492,92 @@ export class VehicleDataClient {
     // Cache in memory for 30 days
     memoryCache.set(cacheKey, complaints, TTL_SECONDS);
     return complaints;
+  }
+
+  /**
+   * Get NCAP safety ratings from NHTSA API
+   * Cache TTL: 24 hours (ratings are immutable once published, but allows periodic refresh)
+   */
+  async getSafetyRatings(
+    year: number,
+    make: string,
+    model: string
+  ): Promise<NCAPRatings | null> {
+    const cacheKey = `ncap:${make}:${model}:${year}`;
+    const TTL_SECONDS = 24 * 60 * 60; // 24 hours
+
+    // Check memory cache
+    const cached = memoryCache.get<NCAPRatings>(cacheKey);
+    if (cached) return cached;
+
+    console.log(`[NCAP] Fetching safety ratings for ${year} ${make} ${model}`);
+
+    try {
+      // Step 1: Search for vehicle IDs
+      const searchUrl = `https://api.nhtsa.gov/SafetyRatings/modelyear/${year}/make/${encodeURIComponent(make)}/model/${encodeURIComponent(model)}`;
+      const searchResponse = await fetch(searchUrl);
+      
+      if (!searchResponse.ok) {
+        console.warn(`[NCAP] Vehicle search failed: HTTP ${searchResponse.status}`);
+        return null;
+      }
+
+      const searchData = (await searchResponse.json()) as NCAPVehicleSearchResponse;
+      
+      if (!searchData.Results || searchData.Results.length === 0) {
+        console.log(`[NCAP] No NCAP ratings found for ${year} ${make} ${model}`);
+        return null;
+      }
+
+      // Use first vehicle ID (typically 4WD or most common variant)
+      const vehicleId = searchData.Results[0].VehicleId;
+      console.log(`[NCAP] Found vehicle ID: ${vehicleId} (${searchData.Results[0].VehicleDescription})`);
+
+      // Step 2: Fetch detailed ratings
+      const ratingsUrl = `https://api.nhtsa.gov/SafetyRatings/VehicleId/${vehicleId}`;
+      const ratingsResponse = await fetch(ratingsUrl);
+      
+      if (!ratingsResponse.ok) {
+        console.warn(`[NCAP] Ratings fetch failed: HTTP ${ratingsResponse.status}`);
+        return null;
+      }
+
+      const ratingsData = (await ratingsResponse.json()) as NCAPRatingsResponse;
+      
+      if (!ratingsData.Results || ratingsData.Results.length === 0) {
+        console.warn(`[NCAP] No ratings data returned for vehicle ID ${vehicleId}`);
+        return null;
+      }
+
+      const result = ratingsData.Results[0];
+
+      // Map API response to our format
+      const ratings: NCAPRatings = {
+        overall: parseInt(result.OverallRating) || 0,
+        frontDriver: parseInt(result.FrontCrashDriversideRating) || 0,
+        frontPassenger: parseInt(result.FrontCrashPassengersideRating) || 0,
+        side: parseInt(result.OverallSideCrashRating) || 0,
+        rollover: parseInt(result.RolloverRating) || 0,
+        rolloverPossibility: result.RolloverPossibility * 100, // Convert to percentage
+        features: {
+          electronicStabilityControl: result.NHTSAElectronicStabilityControl || 'Not Available',
+          forwardCollisionWarning: result.NHTSAForwardCollisionWarning || 'Not Available',
+          laneDepartureWarning: result.NHTSALaneDepartureWarning || 'Not Available',
+        },
+        vehicleId,
+        lastUpdated: new Date(),
+      };
+
+      console.log(`[NCAP] Ratings: Overall=${ratings.overall}, Front=${ratings.frontDriver}/${ratings.frontPassenger}, Side=${ratings.side}, Rollover=${ratings.rollover}`);
+
+      // Cache for 24 hours
+      memoryCache.set(cacheKey, ratings, TTL_SECONDS);
+      return ratings;
+    } catch (error) {
+      console.error('[NCAP] Error fetching ratings:', error);
+      // Non-fatal - return null to allow safety endpoint to work without ratings
+      return null;
+    }
   }
 
   // ============================================================================

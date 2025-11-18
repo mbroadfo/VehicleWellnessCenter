@@ -68,13 +68,14 @@ export async function getVehicleSafetyHandler(
       };
     }
 
-    // Fetch recalls and complaints in parallel
-    let recalls, complaints;
+    // Fetch recalls, complaints, and NCAP ratings in parallel
+    let recalls, complaints, ncapRating;
 
     try {
-      [recalls, complaints] = await Promise.all([
+      [recalls, complaints, ncapRating] = await Promise.all([
         vehicleDataClient.getRecalls(make, model, year),
         vehicleDataClient.getComplaints(make, model, year),
+        vehicleDataClient.getSafetyRatings(year, make, model),
       ]);
     } catch (error) {
       if (error instanceof ExternalAPIError) {
@@ -97,10 +98,25 @@ export async function getVehicleSafetyHandler(
       lastChecked: new Date(),
     };
 
-    // Persist safety data in MongoDB (vehicle.safety)
+    // Add NCAP ratings if available (separate from SafetyData for backward compatibility)
+    const safetyResponse = {
+      ...safetyData,
+      ...(ncapRating && { ncapRating }),
+    };
+
+    // Persist safety data in MongoDB (vehicle.safety + vehicle.ncapRating)
+    const updateDoc: Record<string, unknown> = {
+      safety: safetyData,
+      safetyLastChecked: new Date(),
+    };
+    
+    if (ncapRating) {
+      updateDoc.ncapRating = ncapRating;
+    }
+
     let updateResult = await vehiclesCollection.updateOne(
       { _id: new ObjectId(vehicleId) },
-      { $set: { safety: safetyData, safetyLastChecked: new Date() } }
+      { $set: updateDoc }
     );
     if (updateResult.matchedCount === 0) {
       // Fallback: try updating by VIN if available (for test reliability)
@@ -132,11 +148,13 @@ export async function getVehicleSafetyHandler(
           year: vehicle.year,
           vin: vehicle.vin || null,
         },
-        safety: safetyData,
+        safety: safetyResponse,
         summary: {
           totalRecalls: recalls.length,
           totalComplaints: complaints.length,
           hasActiveRecalls: recalls.length > 0,
+          hasNCAPRatings: !!ncapRating,
+          overallRating: ncapRating?.overall || null,
           complaintsWithInjuries: complaints.filter((c) => c.numberOfInjuries > 0).length,
           complaintsWithDeaths: complaints.filter((c) => c.numberOfDeaths > 0).length,
           complaintsWithFire: complaints.filter((c) => c.fire).length,
