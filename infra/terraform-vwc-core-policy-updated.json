@@ -138,7 +138,10 @@
         "ssm:PutParameter",
         "ssm:RemoveTagsFromResource"
       ],
-      "Resource": "arn:aws:ssm:us-west-2:*:parameter/vwc/*"
+      "Resource": [
+        "arn:aws:ssm:us-west-2:*:parameter/vwc/dev/secrets",
+        "arn:aws:ssm:us-west-2:*:parameter/vwc/dev/auth0-token-cache"
+      ]
     },
     {
       "Sid": "ParameterStoreDescribe",
