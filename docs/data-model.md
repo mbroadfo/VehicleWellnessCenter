@@ -19,6 +19,40 @@ Represents a single vehicle under management.
 - `valuation` (object) – `{ source, amount, currency, asOf }`.
 - `ownership` (object) – `{ ownerId, ownerName, garageLocation }`.
 - `tags` (array of strings) – e.g., `['daily-driver', 'warranty']`.
+- `specs` (object, optional) – VIN decode results from NHTSA vPIC API, stored permanently (immutable)
+  - `engine` (object) – `{ cylinders, displacement, fuelType, horsepower?, manufacturer? }`
+  - `body` (object) – `{ type, doors, style? }`
+  - `safety` (object) – `{ airbags?, abs?, esc? }`
+  - `transmission` (object, optional) – `{ type, speeds? }`
+  - `weights` (object, optional) – `{ gvwr?, curb? }`
+  - `decodedAt` (ISODate) – timestamp of VIN decode operation
+  - `source` (string) – always `"NHTSA_vPIC"`
+- `safety` (object, optional) – Safety data from NHTSA Recalls and Complaints APIs
+  - `recalls` (array of objects) – Active recalls for this vehicle's make/model/year
+    - `manufacturer` (string)
+    - `NHTSACampaignNumber` (string)
+    - `reportReceivedDate` (string)
+    - `component` (string)
+    - `summary` (string)
+    - `consequence` (string)
+    - `remedy` (string)
+    - `notes` (string)
+    - `modelYear` (string)
+    - `make` (string)
+    - `model` (string)
+  - `complaints` (array of objects) – Safety complaints filed with NHTSA
+    - `odiNumber` (number)
+    - `manufacturer` (string)
+    - `crash` (boolean)
+    - `fire` (boolean)
+    - `numberOfInjuries` (number)
+    - `numberOfDeaths` (number)
+    - `dateOfIncident` (string)
+    - `dateComplaintFiled` (string)
+    - `vin` (string)
+    - `components` (string)
+    - `summary` (string)
+  - `lastChecked` (ISODate) – timestamp of last safety data refresh (used for TTL checking)
 - `createdAt` / `updatedAt` (ISODate)
 
 Indexes:

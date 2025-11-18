@@ -61,13 +61,15 @@ All API endpoints are protected with Auth0 JWT authentication - valid tokens req
   - Decodes VIN and enriches vehicle with specifications from NHTSA vPIC API
   - Request: `{ vin?: string }` (optional if vehicle already has VIN)
   - Response: `{ success, message, vehicle, specs }` with comprehensive vehicle specifications
-  - Features: ISO 3779 VIN validation, two-tier caching (memory + Parameter Store)
+  - Features: ISO 3779 VIN validation, memory cache for Lambda container reuse
+  - Persistence: Stores VIN specs in MongoDB `vehicle.specs` (immutable, no expiration)
   - Returns: 145+ vehicle data points (make, model, year, engine, body, safety, transmission)
 
 - **GET /vehicles/{vehicleId}/safety** (`src/routes/getVehicleSafety.ts`)
   - Fetches active recalls and safety complaints from NHTSA APIs
-  - Response: `{ success, vehicle, safety: { recalls, complaints }, summary: { totalRecalls, totalComplaints } }`
-  - Features: Two-tier caching (memory + Parameter Store), 7-day TTL for recalls, 30-day TTL for complaints
+  - Response: `{ success, vehicle, safety: { recalls, complaints, lastChecked }, summary: { totalRecalls, totalComplaints } }`
+  - Caching: Memory cache (Lambda container) for hot path optimization
+  - Persistence: Stores safety data in MongoDB `vehicle.safety` with `lastChecked` timestamp
   - Data sources: NHTSA Recalls API, NHTSA Complaints API (free government services)
   - Returns: Comprehensive safety data including campaign numbers, dates, components, summaries, injuries/deaths
 

@@ -4,6 +4,31 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Phase 2 - Safety Intelligence - DataCache Removal] - 2025-11-17
+
+### Changed
+- **Backend**: Refactored safety endpoint (`getVehicleSafetyHandler`) to use memoryCache and persist safety data in MongoDB
+  - Added fallback update by VIN for test reliability
+  - Safety data now stored in `vehicle.safety` with `lastChecked` timestamp
+  - Memory cache used for Lambda container optimization (hot path)
+- **Backend**: Removed legacy DataCache class from `externalApis.ts`
+  - Eliminated Parameter Store caching for external API responses
+  - Simplified to memory-only cache for VIN decode, recalls, and complaints
+  - Parameter Store now only used for secrets (`/vwc/dev/secrets`) and Auth0 token cache (`/vwc/dev/auth0-token-cache`)
+- **Tests**: Updated all safety and enrichment tests to validate MongoDB persistence
+  - All 68 backend tests passing
+  - Tests verify memory cache behavior and MongoDB document updates
+
+### Fixed
+- Safety data persistence issue for test vehicles resolved by fallback update logic in handler
+- Test reliability improved for safety endpoint and caching operations
+- Eliminated Parameter Store size limit errors (4KB/32KB) by removing external API caching
+
+### Documentation
+- Updated `backend/README.md` to reflect memory cache + MongoDB persistence strategy
+- Updated `docs/job-jar-remove-parameter-store-caching.md` status (Phases 1-6 completed)
+- Confirmed all documentation current with new caching strategy
+
 ## [Phase 2 - Safety Intelligence] - 2025-11-16
 
 ### Added - Safety Data Integration
