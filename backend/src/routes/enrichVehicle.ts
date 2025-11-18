@@ -106,11 +106,43 @@ export async function enrichVehicleHandler(
       };
     }
 
-    // Update vehicle document with specs
+    // Fetch EPA fuel economy data (non-blocking - don't fail enrichment if EPA fails)
+    let fuelEconomy = null;
+    try {
+      // Use year/make/model from vPIC specs (now included in VehicleSpecs)
+      if (specs.year && specs.make && specs.model) {
+        console.log(`[enrichVehicle] Fetching EPA data for ${specs.year} ${specs.make} ${specs.model}`);
+        const epaId = await vehicleDataClient.matchVehicleToEPA(
+          specs.year,
+          specs.make,
+          specs.model,
+          specs.engine.cylinders,
+          specs.engine.displacement
+        );
+        
+        if (epaId) {
+          fuelEconomy = await vehicleDataClient.getFuelEconomy(epaId);
+          console.log(`[enrichVehicle] EPA fuel economy: ${fuelEconomy.epa.city}/${fuelEconomy.epa.highway}/${fuelEconomy.epa.combined} MPG`);
+        } else {
+          console.log('[enrichVehicle] No EPA match found for this vehicle');
+        }
+      } else {
+        console.log('[enrichVehicle] Skipping EPA lookup - year/make/model not in vPIC response');
+      }
+    } catch (error) {
+      // Non-blocking error - log and continue
+      console.warn('[enrichVehicle] EPA fetch failed (non-critical):', error);
+    }
+
+    // Update vehicle document with specs and fuel economy
     const updateDoc: Record<string, unknown> = {
       specs,
       updatedAt: new Date(),
     };
+
+    if (fuelEconomy) {
+      updateDoc.fuelEconomy = fuelEconomy;
+    }
 
     // If VIN was provided in request and differs from stored, update it
     if (requestBody.vin && requestBody.vin !== vehicle.vin) {

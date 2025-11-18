@@ -36,6 +36,7 @@
     "@aws-sdk/client-secrets-manager": "^3.929.0",
     "@aws-sdk/client-ssm": "^3.931.0",
     "@google/generative-ai": "^0.24.1",
+    "fast-xml-parser": "^5.2.5",
     "mongodb": "^7.0.0"
   }
 }

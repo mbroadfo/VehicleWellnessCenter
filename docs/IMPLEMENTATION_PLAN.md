@@ -4,21 +4,22 @@
 
 **Goal:** Implement the data storage strategy defined in `data-storage-strategy.md` systematically across all external data sources.
 
-**Current Status:** ✅ 2 of 5 external sources implemented (VIN decode, Safety data)
+**Current Status:** ✅ 3 of 5 external sources implemented (VIN decode, Safety data, EPA Fuel Economy)
 
-**Remaining Work:** 3 external sources + conversation history = 15-20 hours
+**Remaining Work:** 2 external sources (NCAP ratings, Maintenance schedules) = 10-15 hours
 
 ---
 
 ## Current Implementation Status
 
-### ✅ Already Implemented (Phase 9 Complete)
+### ✅ Already Implemented (Phase 10 Complete)
 
 | Data Source | API | Storage | TTL/Refresh | Status |
 |-------------|-----|---------|-------------|--------|
 | **VIN Decode** | NHTSA vPIC | MongoDB `vehicle.specs` | Permanent (immutable) | ✅ Complete |
 | **Safety Recalls** | NHTSA Recalls | MongoDB `vehicle.safety.recalls` | 7-day check | ✅ Complete |
 | **Safety Complaints** | NHTSA Complaints | Memory cache only | 30 days (ephemeral) | ✅ Complete |
+| **Fuel Economy** | EPA Fuel Economy | MongoDB `vehicle.fuelEconomy.epa` | Permanent (immutable) | ✅ Complete |
 
 **Implementation details:**
 - ✅ `externalApis.ts`: `decodeVIN()`, `getRecalls()`, `getComplaints()`
@@ -52,9 +53,9 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 
 ## Remaining External Data Sources
 
-### 🔨 Phase 10: Fuel Economy (EPA) - 4-6 hours
+### ✅ Phase 10: Fuel Economy (EPA) - COMPLETE (2025-11-18)
 
-**API:** EPA Fuel Economy API (free, public)
+**API:** EPA Fuel Economy API (free, public, XML-only)
 - Endpoint: `https://www.fueleconomy.gov/ws/rest/vehicle/{id}`
 - Response: City/Highway/Combined MPG, annual fuel cost, CO2 emissions
 - Size: ~1 KB per vehicle
@@ -63,27 +64,29 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 **Storage Strategy:** MongoDB permanent (Pattern 1)
 
 **Implementation checklist:**
-- [ ] Add EPA API client to `externalApis.ts`
-  ```typescript
-  async getFuelEconomy(year: number, make: string, model: string): Promise<FuelEconomyData>
-  ```
-- [ ] Create route `GET /vehicles/:id/fuel-economy` (or extend `/enrich`)
-- [ ] Store in MongoDB `vehicle.fuelEconomy.epa` (permanent)
-- [ ] Add memory cache (24-hour TTL, Lambda container reuse)
-- [ ] Write tests (unit + integration + external API)
-- [ ] Update TypeScript types in `externalApis.ts` (FuelEconomyData already defined)
-- [ ] Deploy Lambda + update Terraform routes
+- [x] Add EPA API client to `externalApis.ts`
+  - `searchEPAVehicle()`: Hierarchical search via /menu/model + /menu/options
+  - `getFuelEconomy(epaId)`: Fetch fuel economy by EPA vehicle ID
+  - `matchVehicleToEPA()`: Smart matching with engine spec filtering
+  - XML parsing via fast-xml-parser library
+- [x] Integrate with enrichVehicle route (Option A: auto-enrich)
+  - Non-blocking EPA fetch after VIN decode
+  - Stores in MongoDB `vehicle.fuelEconomy.epa` (permanent)
+- [x] Add memory cache (24-hour TTL search, permanent TTL fuel data)
+- [x] Write tests (12 EPA tests, all passing)
+  - Vehicle search, fuel economy fetch, smart matching, caching, error handling
+  - Full test suite: 86 tests passing
+- [x] Update TypeScript types (VehicleSpecs now includes year/make/model)
+- [x] Deploy Lambda (5.35 MB with fast-xml-parser)
 
-**Decision: Dedicated endpoint or extend `/enrich`?**
-- Option A: `POST /vehicles/:id/enrich` adds fuel economy automatically if not present
-- Option B: `GET /vehicles/:id/fuel-economy` explicit fetch
-- **Recommendation:** Option A (auto-enrich), less user friction
+**Implementation Notes:**
+- EPA API is XML-only despite documentation claiming JSON support
+- Hierarchical search pattern: year/make → model list → options (engine/trans) → vehicle ID
+- Multiple variants exist for same model (e.g., 14 variants for 2017 Jeep Cherokee)
+- Smart matching filters by cylinders and displacement to find best match
+- Added VehicleSpecs.year/make/model fields from vPIC response for EPA lookup
 
-**Estimated effort:** 4-6 hours
-- API client: 1 hour
-- Route handler: 1 hour
-- Tests: 2 hours
-- Terraform + deployment: 1 hour
+**Actual effort:** ~6 hours (API exploration, XML parsing, testing, deployment)
 
 ---
 

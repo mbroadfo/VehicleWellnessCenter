@@ -4,6 +4,69 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Phase 10 - EPA Fuel Economy Integration] - 2025-11-18
+
+### Added - EPA Fuel Economy API Client
+
+- **EPA API Client**: Implemented XML-based EPA Fuel Economy API integration in `backend/src/lib/externalApis.ts`
+  - `searchEPAVehicle(year, make, model)`: Hierarchical search via `/menu/model` and `/menu/options` endpoints
+  - `getFuelEconomy(epaId)`: Fetches fuel economy data from `/vehicle/{id}` endpoint
+  - `matchVehicleToEPA()`: Smart matching with engine spec filtering (cylinders, displacement)
+  - XML parsing via `fast-xml-parser` library (40KB, battle-tested, 23M weekly downloads)
+  - Memory caching: 24-hour TTL for vehicle search, permanent cache for fuel economy data
+- **VehicleSpecs Enhancement**: Added year/make/model fields to VehicleSpecs interface
+  - Extracted from NHTSA vPIC response for EPA lookup
+  - Enables EPA matching without requiring vehicle document fields
+- **Enrichment Integration**: Updated `enrichVehicle` route to fetch EPA data after VIN decode
+  - Non-blocking EPA fetch (doesn't fail enrichment if EPA unavailable)
+  - Stores `fuelEconomy.epa` with city/highway/combined MPG, annual fuel cost, CO2 emissions
+  - Automatically matches vehicle to EPA database using engine specs
+
+### Changed - Code Quality
+
+- **ESLint Configuration**: Added `src/lib/externalApis.ts` to unsafe-type exceptions
+  - XML parser returns `any` types, requires unsafe type rules disabled
+  - Consistent with existing pattern for MongoDB and route handlers
+
+### Tested - Comprehensive EPA Test Suite
+
+- **Unit Tests**: 12 new tests in `backend/src/epaClient.test.ts` (all passing)
+  - ✅ EPA vehicle search (14 variants found for 2017 Jeep Cherokee)
+  - ✅ Vehicle ID + engine/transmission description parsing
+  - ✅ Memory cache validation (search and fuel economy caching)
+  - ✅ Fuel economy fetch (18/24/21 MPG for 2017 Cherokee V6)
+  - ✅ Smart matching with cylinder filtering (6-cyl vs 4-cyl)
+  - ✅ Smart matching with displacement filtering (3.2L specification)
+  - ✅ Fallback matching (no engine specs provided)
+  - ✅ Non-existent vehicle handling (returns null)
+  - ✅ Error handling (invalid EPA ID, network errors)
+- **Test Performance**: Cache effectiveness validated
+  - API calls: ~500-1000ms, Cache hits: <1ms (sub-millisecond)
+  - Cache hit rate target: >80% for hot vehicles
+- **Full Test Suite**: All 86 tests passing (74 existing + 12 EPA tests)
+
+### Infrastructure
+
+- **Lambda Deployment**: Updated deployment package to 5.35 MB (includes fast-xml-parser)
+  - Successfully deployed to AWS Lambda (vwc-dev function)
+  - Status: Successful, State: Active
+  - Integration tests pass (17/17 API tests)
+
+### Technical Details
+
+- **EPA API Structure**: RESTful XML API at fueleconomy.gov/ws/rest/
+  - Model search: `/menu/model?year={year}&make={make}`
+  - Options search: `/menu/options?year={year}&make={make}&model={model}`
+  - Vehicle data: `/vehicle/{id}`
+  - Returns 145+ fields including city08, highway08, comb08, fuelCost08, co2TailpipeGpm
+- **Data Fields**: FuelEconomyData interface captures key metrics
+  - `epa.city`: City MPG (EPA test cycle)
+  - `epa.highway`: Highway MPG
+  - `epa.combined`: Combined MPG (55% city, 45% highway)
+  - `epa.annualFuelCost`: Estimated annual fuel cost ($)
+  - `epa.co2`: CO2 emissions (grams/mile)
+  - `lastUpdated`: Timestamp of data retrieval
+
 ## [Phase 13 - Conversation History] - 2025-11-18
 
 ### Added - AI Conversation Persistence
