@@ -4,15 +4,17 @@
 
 **Goal:** Implement the data storage strategy defined in `data-storage-strategy.md` systematically across all external data sources.
 
-**Current Status:** ✅ 4 of 5 external sources implemented (VIN decode, Safety data, EPA Fuel Economy, NCAP Safety Ratings)
+**Current Status:** ✅ 5 of 5 external sources implemented (VIN decode, Safety data, EPA Fuel Economy, NCAP Safety Ratings, Dealer Portal Import)
 
-**Remaining Work:** 1 external source (Market Value Estimates) = 5-7 hours (or 1-2 hours for manual input field)
+**Remaining Work:**
+
+- AI conversation persistence = 4-6 hours (in progress)
 
 ---
 
 ## Current Implementation Status
 
-### ✅ Already Implemented (Phase 11 Complete)
+### ✅ Already Implemented (Phase 12 Complete)
 
 | Data Source | API | Storage | TTL/Refresh | Status |
 |-------------|-----|---------|-------------|--------|
@@ -21,15 +23,19 @@
 | **Safety Complaints** | NHTSA Complaints | Memory cache only | 30 days (ephemeral) | ✅ Complete |
 | **Fuel Economy** | EPA Fuel Economy | MongoDB `vehicle.fuelEconomy.epa` | Permanent (immutable) | ✅ Complete |
 | **NCAP Safety Ratings** | NHTSA NCAP | MongoDB `vehicle.safety.ncapRating` | Permanent (immutable) | ✅ Complete |
+| **Dealer Portal Data** | Gemini AI parsing | MongoDB `vehicle.dealerPortal` + `events` | On-demand (user trigger) | ✅ Complete |
 
 **Implementation details:**
+
 - ✅ `externalApis.ts`: `decodeVIN()`, `getRecalls()`, `getComplaints()`, `getFuelEconomy()`, `getSafetyRatings()`
 - ✅ `enrichVehicle.ts`: Stores specs + EPA fuel economy in MongoDB permanently
 - ✅ `getVehicleSafety.ts`: Stores recalls + NCAP ratings in MongoDB, complaints ephemeral
+- ✅ `importDealerData.ts`: Parses Mopar dashboard/service history via Gemini, stores in MongoDB
 - ✅ Memory cache: Lambda container reuse (15-45 min lifetime)
-- ✅ Tests: 92 passing (unit + integration + external API)
+- ✅ Tests: 100 passing (92 existing + 8 dealer import tests)
 
 **What works perfectly:**
+
 ```typescript
 // Pattern 1: Immutable data → MongoDB permanent
 // Example: VIN decode
@@ -57,6 +63,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 ### ✅ Phase 10: Fuel Economy (EPA) - COMPLETE (2025-11-18)
 
 **API:** EPA Fuel Economy API (free, public, XML-only)
+
 - Endpoint: `https://www.fueleconomy.gov/ws/rest/vehicle/{id}`
 - Response: City/Highway/Combined MPG, annual fuel cost, CO2 emissions
 - Size: ~1 KB per vehicle
@@ -65,6 +72,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 **Storage Strategy:** MongoDB permanent (Pattern 1)
 
 **Implementation checklist:**
+
 - [x] Add EPA API client to `externalApis.ts`
   - `searchEPAVehicle()`: Hierarchical search via /menu/model + /menu/options
   - `getFuelEconomy(epaId)`: Fetch fuel economy by EPA vehicle ID
@@ -81,6 +89,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 - [x] Deploy Lambda (5.35 MB with fast-xml-parser)
 
 **Implementation Notes:**
+
 - EPA API is XML-only despite documentation claiming JSON support
 - Hierarchical search pattern: year/make → model list → options (engine/trans) → vehicle ID
 - Multiple variants exist for same model (e.g., 14 variants for 2017 Jeep Cherokee)
@@ -94,6 +103,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 ### ✅ Phase 11: NCAP Safety Ratings - COMPLETE (2025-11-18)
 
 **API:** NHTSA NCAP API (free, public)
+
 - Endpoint: `https://api.nhtsa.gov/SafetyRatings/modelyear/{year}/make/{make}/model/{model}` (search)
 - Endpoint: `https://api.nhtsa.gov/SafetyRatings/VehicleId/{id}` (ratings)
 - Response: Overall/Frontal/Side/Rollover ratings (1-5 stars), rollover risk %, safety features
@@ -103,6 +113,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 **Storage Strategy:** MongoDB permanent (Pattern 1)
 
 **Implementation checklist:**
+
 - [x] Add NCAP API client to `externalApis.ts`
   - Two-step process: search by year/make/model → fetch ratings by vehicle ID
   - Returns NCAPRatings with star ratings, rollover risk, safety features (ESC/FCW/LDW)
@@ -122,6 +133,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 - [x] Production verification (API Gateway tests passing)
 
 **Implementation Notes:**
+
 - NCAP API uses two-step process: search returns vehicle IDs, then fetch ratings by ID
 - Typically returns first variant (most common, usually 4WD for SUVs)
 - Star ratings range 1-5, rollover risk is percentage (0-100%)
@@ -130,6 +142,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 - Non-blocking implementation: returns null if ratings unavailable, doesn't fail safety endpoint
 
 **Actual effort:** ~4 hours (API exploration, two-step implementation, testing, deployment)
+
 - API client: 1.5 hours (two-step process discovery)
 - Route update: 30 min
 - Tests: 1.5 hours (6 unit tests + integration)
@@ -137,43 +150,283 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 
 ---
 
-### 🔨 Phase 12: Market Value Estimates - 5-7 hours
+### ✅ Phase 12: Dealer Portal Data Import - COMPLETE (2025-11-18)
 
-**API Options:**
-1. **Edmunds API** (requires registration, may have rate limits)
-2. **KBB API** (partner-only, not publicly available)
-3. **NADA API** (paid, not suitable for free tier)
-4. **Alternative:** Manual input field + optional future integration
+**Approach:** AI-powered HTML parsing via Gemini for user copy/paste workflow (pivoted from KBB browser automation)
 
-**Storage Strategy:** MongoDB + TTL (Pattern 2) - if API available
-- TTL: 30 days (values change monthly)
-- Size: ~500 bytes
+**Why we pivoted from KBB:**
 
-**Decision required:**
-- [ ] Research API availability and rate limits
-- [ ] If no free API: Add manual input field for market value
-- [ ] If API available: Implement TTL refresh pattern (like recalls)
+- ❌ **Bot detection:** "Access Denied" from KBB, even with headless browser masking
+- ❌ **Multi-step wizard:** Required mileage, color, features, condition, EMAIL
+- ❌ **Legal concerns:** Violates ToS, no commercial use allowed
+- ❌ **Lower accuracy:** Public estimates less accurate than actual dealer data
+- ✅ **Dealer portal superiority:** Real mileage (3,560 vs 96k estimate), warranty, service history, recalls
 
-**Estimated effort:** 5-7 hours (if API available), 1-2 hours (manual field only)
+**New Strategy:** User-controlled data import from dealer portals (Mopar, GM, Ford, Toyota)
 
-**Recommendation:** Start with manual input field, add API integration later if needed.
+- User logs into dealer portal (e.g., <https://www.mopar.com/my-vehicle/dashboard>)
+- User copies HTML of dashboard page or service history
+- AI parses HTML with Gemini text model (not Vision)
+- System imports: mileage, warranty, coverage plans, service records, recalls
+
+**Architecture:**
+
+```typescript
+// routes/importDealerData.ts
+async function importDealerDataHandler(event: APIGatewayProxyEventV2) {
+  const { vehicleId } = event.pathParameters;
+  const { source, dataType, content } = JSON.parse(event.body);
+  
+  // source: 'mopar' | 'gm' | 'ford' | 'toyota'
+  // dataType: 'dashboard' | 'service_history' | 'recalls' | 'warranty'
+  
+  if (source === 'mopar' && dataType === 'dashboard') {
+    const data = await parseMoparDashboard(content);
+    await updateVehicle(vehicleId, { dealerPortal: data });
+  }
+  
+  if (source === 'mopar' && dataType === 'service_history') {
+    const records = await parseMoparServiceHistory(content);
+    await insertServiceRecords(vehicleId, records);
+  }
+  
+  return { success: true, imported: data };
+}
+
+async function parseMoparDashboard(html: string) {
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const prompt = `Extract from Mopar dashboard: mileage, warranty (dates/mileage), coverage plans, connected services, recalls. Return JSON.`;
+  const result = await model.generateContent([prompt, html]);
+  return JSON.parse(result.response.text());
+}
+```
+
+**Implementation checklist:**
+
+- [x] Add Gemini API client to `lib/parameterStore.ts` (GOOGLE_API_KEY)
+- [x] Create `routes/importDealerData.ts` with Mopar parsers
+  - `parseMoparDashboard()`: Extract mileage, warranty, coverage plans, connected services
+  - `parseMoparServiceHistory()`: Parse service records table
+- [x] Add DealerPortalData interface to `externalApis.ts`
+  - Fields: source, lastSync, mileage, warranty, coveragePlans, connectedServices
+- [x] Store results in MongoDB `vehicle.dealerPortal` (Pattern 2)
+- [x] Add `POST /vehicles/:id/import-dealer-data` endpoint
+- [x] Write tests (8 tests: 7 validation + 1 real data, all passing)
+  - ✅ Real 2017 Jeep Cherokee data: 3,560 miles, warranty expired, TIRE WORKS plan
+- [x] Add error handling for invalid JSON, missing fields, unsupported sources
+- [x] Deploy Lambda (8.19 MB with @google/generative-ai)
+
+**Storage Strategy:** MongoDB (Pattern 2 - mutable data)
+
+- TTL: On-demand refresh (user triggers import manually)
+- Size: ~2 KB per vehicle (dashboard), ~500 bytes per service record
+- Fields: source, lastSync, mileage, mileageDate, warranty, coveragePlans, connectedServices
+
+**Technology Stack:**
+
+- **Gemini 2.0 Flash (text)**: Stable model, free-tier compatible, JSON output
+- **MongoDB**: vehicle.dealerPortal field + events collection (service history)
+- **Parameter Store**: GOOGLE_API_KEY for Gemini authentication
+
+**Actual effort:** ~4 hours
+
+- Research + KBB attempt: 2 hours (abandoned)
+- Mopar parsers + route handler: 1.5 hours
+- Tests + validation: 0.5 hours
+
+**Advantages over KBB automation:**
+
+- ✅ No bot detection - user-controlled
+- ✅ No legal risk - user owns their own data
+- ✅ MORE accurate - real mileage, not estimates
+- ✅ Richer data - warranty, service history, coverage plans
+- ✅ Multi-vendor extensible - Mopar today, GM/Ford/Toyota tomorrow
+- ✅ Zero maintenance - no CSS selectors to break
+
+**Test Results:**
+
+```text
+✓ should import real Mopar dashboard data (1986ms)
+  Imported: { mileage: 1, warrantyUpdates: 1, coveragePlans: 1 }
+  Parsed: 3,560 miles, basic warranty expired 09/23/2020
+  Extracted: MOPAR TIRE WORKS (contract #53769698, expires 05/29/2026)
+  Detected: Uconnect expired
+```
+
+**Future extensions:**
+
+- GM OnStar portal integration
+- Ford Pass integration
+- Toyota Connected Services
+- Service history auto-import from dealer emails (forwarding)
+
+---
+
+### ❌ Phase 12 (Original): AI-Powered Market Value Agent - ABANDONED
+
+**Original Approach:** Browser automation + Gemini Vision for KBB scraping
+
+**Why this approach:**
+
+- ✅ **AI interprets pages** - no brittle CSS selectors
+- ✅ **Adapts to UI changes** - AI reads like a human
+- ✅ **Screenshot debugging** - visual validation
+- ✅ **Free tier available** - Gemini 2.0 Flash Vision
+- ✅ **Internal use only** - no legal/ToS concerns with public MCP server
+- ✅ **Multi-source capable** - KBB, Edmunds, NADA in parallel
+
+**Architecture:**
+
+```typescript
+// routes/getMarketValue.ts
+async function getMarketValueHandler(vehicleId: string): Promise<MarketValueResponse> {
+  // 1. Get vehicle specs from MongoDB
+  const vehicle = await getVehicle(vehicleId);
+  
+  // 2. Launch headless browser (Playwright)
+  const browser = await playwright.chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  
+  // 3. Navigate to KBB (or multiple sites)
+  await page.goto(`https://www.kbb.com/[vin-lookup-url]`);
+  await page.waitForLoadState('networkidle');
+  
+  // 4. Take full-page screenshot
+  const screenshot = await page.screenshot({ 
+    fullPage: true,
+    path: `/tmp/kbb-${vehicleId}-${Date.now()}.png` // Debug artifact
+  });
+  
+  // 5. Ask Gemini Vision to interpret
+  const result = await geminiVisionClient.analyzeImage(screenshot, {
+    prompt: `Extract vehicle market value data from this KBB page. Return JSON:
+      { 
+        fairMarketValue: number,
+        tradeInValue: number,
+        privatePartyValue: number,
+        retailValue: number,
+        mileageUsed: number,
+        conditionAssumption: string,
+        confidence: "high" | "medium" | "low",
+        source: "kbb",
+        fetchedAt: string
+      }`
+  });
+  
+  // 6. Store in MongoDB with TTL
+  await updateVehicle(vehicleId, { 
+    marketValue: result,
+    marketValueFetchedAt: new Date()
+  });
+  
+  await browser.close();
+  return result;
+}
+```
+
+**Proven Navigation Flow (Researched 2025-11-18):**
+
+```text
+1. Navigate: https://www.kbb.com/whats-my-car-worth/
+2. Click VIN tab (three tabs: VIN | Make/Model | Plate)
+3. Enter VIN in input[placeholder*="17-digit VIN"]
+4. Click "Go" button
+5. Wait for networkidle
+6. Screenshot full page
+7. Gemini Vision extracts: tradeInValue, privatePartyValue, retailValue, fairMarketRange
+```
+
+**Implementation checklist:**
+
+- [ ] Add Playwright to dependencies (`npm install playwright`)
+- [ ] Configure Gemini Vision API (already have Gemini API key)
+- [ ] Create `lib/geminiVision.ts` helper for image analysis
+- [ ] Create `routes/getMarketValue.ts` with browser automation
+  - Navigate to KBB whats-my-car-worth
+  - Click VIN tab, enter VIN, submit
+  - Take full-page screenshot
+  - Extract values with Gemini Vision
+- [ ] Add vision analysis prompt with structured JSON schema
+- [ ] Store results in MongoDB `vehicle.marketValue` with 30-day TTL
+- [ ] Add `GET /vehicles/:id/market-value` endpoint
+- [ ] Write tests (mock Playwright + Gemini Vision)
+- [ ] Add error handling for timeouts, bot detection, captchas
+- [ ] Optional: Try multiple sources (KBB, Edmunds) and average results
+- [ ] Deploy Lambda with Playwright layer (or use AWS Lambda Playwright layer)
+
+**Storage Strategy:** MongoDB + TTL (Pattern 2)
+
+- TTL: 30 days (market values change monthly)
+- Size: ~800 bytes per vehicle
+- Fields: fairMarketValue, tradeInValue, privatePartyValue, retailValue, source, confidence
+
+**Technology Stack:**
+
+- **Playwright**: Headless Chrome automation (better than Puppeteer for stability)
+- **Gemini 2.0 Flash Vision**: Free tier, fast vision interpretation
+- **MongoDB**: 30-day TTL for automatic staleness handling
+- **AWS Lambda**: May need increased timeout (60s → 90s) for browser launch
+
+**Estimated effort:** 6-8 hours
+
+- Playwright setup + browser automation: 2 hours
+- Gemini Vision integration: 1.5 hours
+- KBB navigation logic: 1.5 hours
+- Route handler + MongoDB storage: 1 hour
+- Tests + error handling: 2 hours
+- Lambda deployment (Playwright layer): 1 hour
+
+**Advantages over screen scraping:**
+
+- No CSS selector maintenance (AI reads visually)
+- Handles dynamic content naturally
+- Fails gracefully with confidence scores
+- Screenshot artifacts for debugging
+- Can adapt to multiple sites with same code
+
+**Considerations:**
+
+- Lambda timeout: Increase to 90 seconds (browser launch ~5-10s)
+- Lambda size: Playwright layer adds ~80 MB (within 250 MB limit)
+- Rate limiting: Add exponential backoff for 429/bot detection
+- Fallback: Manual input field if automation fails
+
+**Alternative (if browser automation too complex):** Manual input field for market value (1-2 hours)
+
+---
+
+### 🔨 Phase 13: Market Value Field (Manual Fallback) - 1-2 hours
+
+**Simple alternative if Phase 12 proves too complex:**
+
+**Implementation:**
+
+- [ ] Add `marketValue` field to vehicle schema (optional)
+- [ ] Add manual input in frontend UI
+- [ ] No API integration, user enters value manually
+- [ ] Store with timestamp for tracking staleness
+
+**Estimated effort:** 1-2 hours (schema update + UI field)
 
 ---
 
 ## Conversation History Implementation
 
-### 🎯 Phase 13: AI Conversation Persistence - 4-6 hours
+### 🎯 Phase 14: AI Conversation Persistence - 4-6 hours
 
 **Goal:** Store chat history with automatic cleanup (30-day TTL)
 
 **Storage Strategy:** MongoDB + TTL indexes (auto-delete after 30 days)
 
 **Collections:**
+
 1. **`conversation_sessions`** - Metadata
 2. **`conversation_messages`** - Individual prompts/responses
 
 **Implementation checklist:**
+
 - [ ] Create MongoDB collections with TTL indexes
+
   ```javascript
   db.createCollection('conversation_messages');
   db.conversation_messages.createIndex({ timestamp: 1 }, { expireAfterSeconds: 2592000 }); // 30 days
@@ -181,7 +434,9 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
   db.createCollection('conversation_sessions');
   db.conversation_sessions.createIndex({ lastActiveAt: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
   ```
+
 - [ ] Update `aiChat.ts` to persist messages
+
   ```typescript
   // Before calling Gemini
   await db.collection('conversation_messages').insertOne({
@@ -204,8 +459,10 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
     timestamp: new Date()
   });
   ```
+
 - [ ] Add `GET /conversations/:sessionId/messages` endpoint
 - [ ] Update session metadata on each message
+
   ```typescript
   await db.collection('conversation_sessions').updateOne(
     { _id: new ObjectId(sessionId) },
@@ -216,7 +473,9 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
     { upsert: true }
   );
   ```
+
 - [ ] Add conversation history to Gemini context
+
   ```typescript
   const history = await db.collection('conversation_messages')
     .find({ sessionId: new ObjectId(sessionId) })
@@ -234,10 +493,12 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
     tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }]
   });
   ```
+
 - [ ] Write tests for conversation persistence
 - [ ] Update MongoDB init scripts (`init-collections.ts`)
 
 **Estimated effort:** 4-6 hours
+
 - Collection setup + indexes: 30 min
 - Update `aiChat.ts`: 2 hours
 - Add history context: 1 hour
@@ -251,14 +512,16 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 ## Implementation Sequence (Recommended)
 
 ### Sprint 1: Complete Milestone 4 (Chat Enhancement)
+
 **Effort:** 4-6 hours
 **Goal:** Production-ready AI chat with context persistence
 
-1. ✅ Complete Phase 13 (Conversation History)
+1. ✅ Complete Phase 14 (Conversation History)
 2. ✅ Test with real vehicle data
 3. ✅ Commit: `feat(ai): add conversation history with 30-day TTL`
 
 **Deliverables:**
+
 - Persistent chat sessions
 - AI remembers previous conversation
 - Automatic cleanup (30/90-day TTL)
@@ -267,19 +530,23 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 ---
 
 ### Sprint 2: Expand Vehicle Enrichment
+
 **Effort:** 7-10 hours
 **Goal:** Complete vehicle data enrichment suite
 
 1. ✅ Phase 10: Fuel Economy (EPA)
 2. ✅ Phase 11: NCAP Safety Ratings
-3. ✅ (Optional) Phase 12: Market Value (manual input field)
+3. 🔨 Phase 12: AI Market Value Agent (browser automation + vision)
+4. ⏸️ Phase 13: Market Value Manual Field (fallback)
 
 **Commits:**
+
 - `feat(enrich): add EPA fuel economy data`
 - `feat(safety): add NCAP safety ratings`
 - `feat(vehicle): add market value field`
 
 **Deliverables:**
+
 - One-click vehicle enrichment (VIN → all data)
 - Comprehensive vehicle profile (specs + safety + economy)
 - Smart caching (immutable data stored permanently)
@@ -287,6 +554,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 ---
 
 ### Sprint 3: Frontend (Milestone 5)
+
 **Effort:** 15-20 hours
 **Goal:** User-facing React SPA
 
@@ -302,6 +570,7 @@ const complaints = await vehicleDataClient.getComplaints(make, model, year);
 ## Testing Strategy
 
 ### Per-Phase Testing Checklist
+
 For each new data source (Phases 10-12):
 
 - [ ] **Unit tests** (2-3 tests per function)
@@ -320,7 +589,8 @@ For each new data source (Phases 10-12):
   - Verify cache behavior (MISS → HIT)
 
 ### Test File Locations
-```
+
+```text
 backend/src/
   lib/
     externalApis.test.ts     # Add EPA + NCAP tests
@@ -338,8 +608,10 @@ backend/tests/
 ## External API Documentation
 
 ### EPA Fuel Economy API
-**Documentation:** https://www.fueleconomy.gov/feg/ws/
+
+**Documentation:** <https://www.fueleconomy.gov/feg/ws/>
 **Example request:**
+
 ```bash
 # Step 1: Get vehicle ID by year/make/model
 curl "https://www.fueleconomy.gov/ws/rest/vehicle/menu/options?year=2017&make=Jeep&model=Cherokee"
@@ -349,6 +621,7 @@ curl "https://www.fueleconomy.gov/ws/rest/vehicle/40783"
 ```
 
 **Response structure:**
+
 ```json
 {
   "id": 40783,
@@ -367,13 +640,16 @@ curl "https://www.fueleconomy.gov/ws/rest/vehicle/40783"
 ---
 
 ### NHTSA NCAP Safety Ratings API
-**Documentation:** https://api.nhtsa.gov/products/vehicle/v-ratings
+
+**Documentation:** <https://api.nhtsa.gov/products/vehicle/v-ratings>
 **Example request:**
+
 ```bash
 curl "https://api.nhtsa.gov/SafetyRatings/modelyear/2017/make/Jeep/model/Cherokee"
 ```
 
 **Response structure:**
+
 ```json
 {
   "Count": 1,
@@ -497,6 +773,7 @@ return { statusCode: 200, body: JSON.stringify({ data }) };
 ## Success Metrics
 
 ### Per-Phase Validation
+
 - [ ] All tests passing (`npm test`)
 - [ ] Lint + typecheck clean (`npm run lint && npm run typecheck`)
 - [ ] Manual testing with 2+ real vehicles
@@ -505,6 +782,7 @@ return { statusCode: 200, body: JSON.stringify({ data }) };
 - [ ] API response time <2 seconds (excluding cold start)
 
 ### Overall Success (All Phases Complete)
+
 - [ ] **External data sources:** 5 of 5 implemented (VIN, Recalls, Complaints, EPA, NCAP)
 - [ ] **Conversation history:** Persistent with TTL cleanup
 - [ ] **Storage usage:** <50% of free tier (256 MB)
@@ -517,6 +795,7 @@ return { statusCode: 200, body: JSON.stringify({ data }) };
 ## Cost & Risk Analysis
 
 ### Storage Cost (MongoDB Atlas M0 Free Tier)
+
 | Data Type | Per Vehicle | 10 Vehicles | 50 Vehicles | 100 Vehicles |
 |-----------|-------------|-------------|-------------|--------------|
 | VIN Specs | 3 KB | 30 KB | 150 KB | 300 KB |
@@ -531,6 +810,7 @@ return { statusCode: 200, body: JSON.stringify({ data }) };
 **Verdict:** ✅ Comfortable headroom for 100 vehicles on free tier
 
 ### API Rate Limits
+
 | API | Rate Limit | Cost | Risk |
 |-----|------------|------|------|
 | NHTSA vPIC | None documented | Free | ✅ Low |
@@ -554,6 +834,7 @@ return { statusCode: 200, body: JSON.stringify({ data }) };
 **Ready to start? Which phase would you like to tackle first?**
 
 Options:
+
 - **A) Phase 13 (Conversation History)** - Completes Milestone 4, 4-6 hours
 - **B) Phase 10 (EPA Fuel Economy)** - Quick win, 4-6 hours
 - **C) Review GitHub outage status** - Try pushing Phase 9 commit first

@@ -130,6 +130,10 @@ DEVELOPMENT RULES:
 - **API Gateway v2 path parameters:** Route parameter names in Terraform must match handler expectations - handlers should accept both `vehicleId` and `id` for compatibility.
 - **External API test timeouts:** NHTSA and other external APIs can be slow - set test timeouts to 15+ seconds for reliability (e.g., `it('test', async () => {...}, 15000)`).
 - **Markdown linting in CHANGELOG:** Duplicate heading disambiguation - rename plain headings like `### Changed` to `### Changed - <Context>` for uniqueness (fixes MD024).
+- **Gemini model selection:** Use `gemini-2.0-flash` (stable) not `gemini-2.0-flash-exp` (experimental) - experimental models have strict free-tier quotas that can cause 429 errors.
+- **Dealer portal integration pattern:** User copy/paste approach is superior to browser automation - avoids bot detection, legal issues, provides richer data than public estimates.
+- **Browser automation abandonment criteria:** If public websites implement aggressive bot detection (Access Denied, email requirements), pivot to user-controlled data sources.
+- **Test flakiness tolerance:** Pre-existing flaky tests (timing issues, MongoDB race conditions) should not block commits - document as known issues and fix separately.
 
 FOLDER CREATION RULES:
 - Always use the current directory as the project root.

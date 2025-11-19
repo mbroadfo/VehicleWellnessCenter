@@ -37,6 +37,7 @@
     "@aws-sdk/client-ssm": "^3.931.0",
     "@google/generative-ai": "^0.24.1",
     "fast-xml-parser": "^5.2.5",
-    "mongodb": "^7.0.0"
+    "mongodb": "^7.0.0",
+    "playwright": "^1.56.1"
   }
 }

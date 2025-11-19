@@ -17,7 +17,7 @@ export interface AppSecrets {
   AUTH0_AUDIENCE: string;
   AUTH0_M2M_CLIENT_ID: string;
   AUTH0_M2M_CLIENT_SECRET: string;
-  GOOGLE_GEMINI_API_KEY?: string;
+  GOOGLE_API_KEY?: string;
 }
 
 let cachedSecrets: AppSecrets | null = null;

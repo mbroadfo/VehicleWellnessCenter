@@ -122,6 +122,35 @@ export interface NCAPRatings {
   lastUpdated: Date;
 }
 
+// Dealer Portal Data Types (imported from user's dealer website)
+export interface DealerPortalData {
+  source: 'mopar' | 'gm' | 'ford' | 'toyota';
+  lastSync: Date;
+  mileage?: number;
+  mileageDate?: Date;
+  
+  warranty?: {
+    basic?: { expirationDate: Date; expirationMileage: number; status: 'active' | 'expired' };
+    powertrain?: { expirationDate: Date; expirationMileage: number; status: 'active' | 'expired' };
+    other?: Array<{ type: string; expiration: Date; mileage: number }>;
+  };
+  
+  coveragePlans?: Array<{
+    name: string;
+    contractNumber: string;
+    startDate: Date;
+    endDate: Date;
+    type: 'tire' | 'maintenance' | 'extended_warranty' | 'other';
+    details?: any;
+  }>;
+  
+  connectedServices?: {
+    uconnect?: { status: 'active' | 'expired' | 'unavailable'; expirationDate?: Date };
+    remote?: boolean;
+    other?: any;
+  };
+}
+
 // ============================================================================
 // Caching Infrastructure
 // ============================================================================

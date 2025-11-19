@@ -4,6 +4,78 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Phase 12 - Dealer Portal Data Import] - 2025-11-18
+
+### Added - Mopar Dashboard Integration
+
+- **Dealer Portal Import Endpoint**: New `POST /vehicles/:id/import-dealer-data` route in `backend/src/routes/importDealerData.ts`
+  - Purpose: Parse dealer portal HTML/screenshots via Gemini AI and import to MongoDB
+  - Supports: Mopar dashboard data (with extensibility for GM, Ford, Toyota)
+  - Data types: `dashboard` (mileage, warranty, coverage plans), `service_history` (maintenance records)
+  - Gemini model: `gemini-2.0-flash` (stable, free-tier compatible) for structured JSON extraction
+  - Temperature: 0.1 for factual accuracy
+- **Mopar Dashboard Parser**: `parseMoparDashboard(html)` extracts:
+  - Actual mileage with sync date (e.g., 3,560 miles vs 96k estimate)
+  - Warranty status: Basic limited warranty with expiration date/mileage
+  - Coverage plans: Tire Works, extended warranty, etc. (name, contract #, dates, type)
+  - Connected services: Uconnect, remote services status
+  - Safety recalls: Count of incomplete vs complete
+- **Service History Parser**: `parseMoparServiceHistory(html)` extracts:
+  - Service records table: date, description, provider, odometer
+  - Imports to events collection with `source: 'mopar_import'` tag
+  - Deduplication: Date + description matching prevents duplicates
+- **MongoDB Schema Extensions**:
+  - `vehicle.dealerPortal`: New field with source, lastSync, mileage, warranty, coveragePlans, connectedServices
+  - `events` collection: Service history imported from dealer portal
+- **DealerPortalData Interface**: Comprehensive type definition in `backend/src/lib/externalApis.ts`
+  - Multi-vendor support: 'mopar' | 'gm' | 'ford' | 'toyota'
+  - Warranty details: basic, powertrain, other coverage
+  - Coverage plans: Array of contracts with dates and types
+  - Connected services: Uconnect, remote start, subscription status
+
+### Tested - Dealer Import Suite
+
+- **Validation Tests**: 7 new tests in `backend/src/importDealerData.test.ts` (all passing)
+  - ✅ Missing vehicle ID (400)
+  - ✅ Invalid vehicle ID format (400)
+  - ✅ Non-existent vehicle (404)
+  - ✅ Missing request body (400)
+  - ✅ Invalid JSON body (400)
+  - ✅ Missing required fields: source, dataType, content (400)
+  - ✅ Unsupported source (non-Mopar, 400)
+- **Real Data Test**: Tested with actual 2017 Jeep Cherokee "Horace" Mopar dashboard
+  - ✅ Parsed: 3,560 miles, basic warranty expired 09/23/2020
+  - ✅ Extracted: MOPAR TIRE WORKS plan (contract #53769698, expires 05/29/2026)
+  - ✅ Detected: Uconnect expired
+  - ✅ MongoDB updated: vehicle.dealerPortal field and events collection
+  - Response: `{ mileage: 1, warrantyUpdates: 1, coveragePlans: 1 }`
+- **Test Coverage**: All 8 tests passing (7 validation + 1 real data)
+
+### Changed - KBB Approach Abandoned
+
+- **Market Value Plan Pivot**: Original Phase 12 plan was KBB scraping with Playwright + Gemini Vision
+  - Research: Found VIN entry form at <https://www.kbb.com/whats-my-car-worth/>
+  - Implementation: Built 307-line `getMarketValue.ts` with Playwright browser automation
+  - Blockers: Bot detection ("Access Denied"), multi-step wizard requiring email
+  - Decision: User rejected approach ("KBB has made a good fly trap... This is too much")
+- **Superior Alternative**: Dealer portal data is MORE valuable than public estimates
+  - User-controlled: Copy/paste approach, no security risk
+  - Accurate: Real mileage (3,560 vs 96k estimate), actual service history
+  - Legal: No bot detection concerns, no ToS violations
+  - Richer data: Warranty, coverage plans, recalls, connected services
+- **Gemini Vision Module Retained**: `backend/src/lib/geminiVision.ts` (150 lines) kept for future features
+  - Available for: Receipt scanning, damage photo analysis, inspection reports
+  - Not used in Phase 12 (text model sufficient for HTML parsing)
+
+### Infrastructure - Phase 12
+
+- **Lambda Deployment**: Updated deployment package to 8.19 MB
+  - Successfully deployed to AWS Lambda (vwc-dev function)
+  - New endpoint: `POST /vehicles/:id/import-dealer-data`
+  - API key: GOOGLE_API_KEY in Parameter Store for Gemini text model
+- **Playwright Dependency**: Added but unused in final solution (kept for future features)
+  - 4 packages, 2 vulnerabilities (non-blocking, isolated from production Lambda)
+
 ## [Phase 11 - NCAP Safety Ratings Integration] - 2025-11-18
 
 ### Added - NHTSA NCAP Safety Ratings
@@ -45,7 +117,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Ratings fetched: Overall=4★, Front=4/4★, Side=5★, Rollover=4★
   - Cache working with 86400s (24-hour) TTL
 
-### Infrastructure
+### Infrastructure - Phase 11
 
 - **Lambda Deployment**: Updated deployment package to 5.36 MB
   - Successfully deployed to AWS Lambda (vwc-dev function)
@@ -100,7 +172,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Cache hit rate target: >80% for hot vehicles
 - **Full Test Suite**: All 86 tests passing (74 existing + 12 EPA tests)
 
-### Infrastructure
+### Infrastructure - Phase 10
 
 - **Lambda Deployment**: Updated deployment package to 5.35 MB (includes fast-xml-parser)
   - Successfully deployed to AWS Lambda (vwc-dev function)
@@ -138,10 +210,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `GET /conversations/{sessionId}/messages` - Fetch all messages for a session
   - User authentication and session ownership validation
   - Returns session metadata + chronological message list
-- **Infrastructure**: API Gateway route for conversation history retrieval
+- **API Routes**: API Gateway route for conversation history retrieval
   - `GET /conversations/{sessionId}/messages` with JWT authorization
 
-### Changed - AI Chat Handler
+### Changed - AI Chat Handler (Phase 13)
 
 - **Backend**: Enhanced `aiChat.ts` to persist all conversations in MongoDB
   - Auto-creates new session if `sessionId` not provided in request
@@ -175,7 +247,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Cold Start Resilient**: Conversation history persists across Lambda container restarts
 - **User Privacy**: Each user's sessions isolated, automatic expiration enforces data minimization
 
-### Technical Details
+### Technical Details - Phase 13
 
 - **Lambda Package**: 4.92 MB (includes new conversation code)
 - **Caching Strategy**: MongoDB persistent storage + Lambda memory cache for session data
