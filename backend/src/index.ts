@@ -7,6 +7,7 @@ import { enrichVehicleHandler } from "./routes/enrichVehicle";
 import { getVehicleSafetyHandler } from "./routes/getVehicleSafety";
 import { getConversationMessagesHandler } from "./routes/getConversationMessages";
 import { importDealerDataHandler } from "./routes/importDealerData";
+import { createVehicle } from "./routes/createVehicle";
 
 /**
  * Main Lambda Router
@@ -31,6 +32,10 @@ export const handler = async (
 
   try {
     // Route to appropriate handler
+    if (method === "POST" && path === "/vehicles") {
+      return await createVehicle(event);
+    }
+
     if (method === "GET" && path.match(/^\/vehicles\/[^/]+\/overview$/)) {
       return await getVehicleOverviewHandler(event);
     }

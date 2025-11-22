@@ -659,6 +659,14 @@ resource "aws_lambda_permission" "api_gateway_vwc" {
 # API Routes (All point to unified Lambda)
 # ============================================================================
 
+resource "aws_apigatewayv2_route" "create_vehicle" {
+  api_id             = aws_apigatewayv2_api.vwc_api.id
+  route_key          = "POST /vehicles"
+  target             = "integrations/${aws_apigatewayv2_integration.vwc.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+}
+
 resource "aws_apigatewayv2_route" "get_vehicle_overview" {
   api_id             = aws_apigatewayv2_api.vwc_api.id
   route_key          = "GET /vehicles/{vehicleId}/overview"
