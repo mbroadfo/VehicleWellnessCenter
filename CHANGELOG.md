@@ -4,6 +4,16 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Runtime Update] - 2025-11-21
+
+### Changed - Infrastructure
+
+- **Lambda Runtime**: Upgraded from Node.js 20.x to Node.js 22.x
+  - Proactive upgrade ahead of Node.js 20.x EOL (April 30, 2026)
+  - Avoids AWS Lambda runtime deprecation warnings
+  - All integration tests passing on Node.js 22.x
+- **Package Engines**: Updated Node.js requirement to >=22.0.0, npm to >=10.0.0
+
 ## [Phase 13 - Frontend Development - Initial Build] - 2025-11-20
 
 ### Added - Frontend Infrastructure

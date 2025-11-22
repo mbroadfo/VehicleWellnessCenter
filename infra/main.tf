@@ -508,7 +508,7 @@ resource "aws_lambda_function" "vwc" {
   function_name = "vwc-${var.environment}"
   role          = aws_iam_role.vwc_lambda_exec.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = 60 # Increased for AI processing + API calls
   memory_size   = 512
 
