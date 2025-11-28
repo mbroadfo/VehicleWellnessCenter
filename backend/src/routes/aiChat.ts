@@ -114,6 +114,20 @@ const FUNCTION_DECLARATIONS = [
       },
       required: ["vehicleId"]
     }
+  },
+  {
+    name: "getVehicleSafety",
+    description: "Get comprehensive safety data including NHTSA recalls, consumer complaints, and NCAP crash test ratings. Use when user asks about recalls, safety, or crash ratings.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        vehicleId: {
+          type: SchemaType.STRING,
+          description: "The MongoDB ObjectId of the vehicle"
+        }
+      },
+      required: ["vehicleId"]
+    }
   }
 ];
 
@@ -125,11 +139,18 @@ YOUR ROLE:
 You help users manage their vehicle history by creating, reading, and understanding 
 vehicle events. You also enrich vehicle data with specifications from authoritative sources.
 
+CONTEXT AWARENESS:
+When you receive a message with "[Context: User is viewing vehicle {vehicleId}]", that 
+is the active vehicle the user is asking about. USE THAT VEHICLE ID for all function calls 
+unless the user explicitly mentions a different vehicle. Do NOT ask for the vehicle ID if 
+it's provided in the context.
+
 AVAILABLE TOOLS:
-1. getVehicleOverview(vehicleId) - Get vehicle details from MongoDB
-2. listVehicleEvents(vehicleId, eventType?, limit?) - List vehicle events from MongoDB
-3. recordVehicleEvent(vehicleId, type, occurredAt, summary, cost?, mileage?, notes?) - Create event in MongoDB
-4. enrichVehicleFromVIN(vehicleId, vin?) - Decode VIN and enrich vehicle with NHTSA specifications
+1. getVehicleOverview(vehicleId) - Get ALL vehicle data including specs, safety, fuel economy, and details. Use this for most queries!
+2. listVehicleEvents(vehicleId, eventType?, limit?) - List vehicle maintenance history
+3. recordVehicleEvent(vehicleId, type, occurredAt, summary, cost?, mileage?, notes?) - Create event
+4. enrichVehicleFromVIN(vehicleId, vin?) - Decode VIN and get NHTSA specifications
+5. getVehicleSafety(vehicleId) - Get ONLY safety data (recalls, complaints, NCAP). Only use if getVehicleOverview already called.
 
 DATA INTEGRITY RULES (CRITICAL):
 
@@ -160,12 +181,19 @@ Cost handling:
 - Always numeric, always positive
 - If user doesn't specify currency, assume USD
 
+UNDERSTANDING DATA SOURCES:
+- getVehicleOverview returns EVERYTHING: specs, safety (recalls/complaints/NCAP), fuel economy (EPA MPG), dealer data, mileage
+- When user asks about fuel economy, safety, or specs: call getVehicleOverview and extract the relevant section
+- Example: User asks "what's my fuel economy?" → Call getVehicleOverview → Return vehicle.fuelEconomy.epa data
+- Only use getVehicleSafety if you already called getVehicleOverview and need ONLY updated safety data
+
 CONVERSATIONAL GUIDELINES:
 ✅ Be proactive: "I see your vehicle is at 15,000 miles. You're due for tire rotation."
 ✅ Validate user input: "Just to confirm, oil change from yesterday at $45?"
 ✅ Handle errors gracefully: "I couldn't find that vehicle. Could you provide the ID?"
 ✅ Suggest next actions: "I've recorded your oil change. View upcoming maintenance?"
 ✅ Explain what you're doing: "Let me check your vehicle details first..."
+✅ For fuel economy/safety/specs: Use getVehicleOverview and extract the specific data requested
 
 REMEMBER: You are the trusted curator of vehicle data. Be accurate, helpful, and 
 maintain data integrity at all times.
@@ -290,6 +318,25 @@ async function executeFunctionCall(
             "Content-Type": "application/json"
           },
           body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API call failed (${response.status}): ${errorText}`);
+        }
+
+        return await response.json();
+      }
+
+      case "getVehicleSafety": {
+        const { vehicleId } = args as { vehicleId: string };
+        const url = `${baseUrl}/vehicles/${vehicleId}/safety`;
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json"
+          }
         });
 
         if (!response.ok) {
@@ -435,10 +482,10 @@ export const handler = async (
     }
 
     // Initialize Gemini
-    // Using gemini-2.5-flash based on your usage logs showing traffic for this model
+    // Using gemini-2.0-flash-exp (experimental but has separate quota from 2.5-flash)
     const genAI = new GoogleGenerativeAI(googleApiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       systemInstruction: SYSTEM_INSTRUCTION,
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS as any }]
     });
@@ -549,6 +596,13 @@ export const handler = async (
       }
     };
 
+    console.log('[aiChat] Returning response:', {
+      sessionId: response.sessionId,
+      messageLength: response.message.length,
+      toolsUsedCount: response.toolsUsed?.length || 0,
+      firstChars: response.message.substring(0, 100)
+    });
+
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
@@ -557,12 +611,42 @@ export const handler = async (
   } catch (error) {
     console.error("AI Chat error:", error);
 
+    // Handle rate limit errors specifically
+    if (error instanceof Error && error.message.includes('429')) {
+      return {
+        statusCode: 429,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          success: false,
+          error: "Rate limit exceeded",
+          message: "The AI service is temporarily unavailable due to high usage. Please try again in a few seconds.",
+          retryAfter: 20 // seconds
+        })
+      };
+    }
+
+    // Handle quota exceeded errors
+    if (error instanceof Error && error.message.includes('quota')) {
+      return {
+        statusCode: 503,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          success: false,
+          error: "Service temporarily unavailable",
+          message: "The AI service has reached its usage limit. Please try again shortly.",
+          retryAfter: 60 // seconds
+        })
+      };
+    }
+
+    // Generic error handling
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        success: false,
         error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error"
+        message: error instanceof Error ? error.message : "An unexpected error occurred. Please try again."
       })
     };
   }

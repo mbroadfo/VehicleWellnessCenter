@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Vehicle } from '../lib/api';
 
 interface VehicleReportProps {
@@ -6,6 +7,9 @@ interface VehicleReportProps {
 }
 
 export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps) {
+  const [recallsExpanded, setRecallsExpanded] = useState(false);
+  const [complaintsExpanded, setComplaintsExpanded] = useState(false);
+  
   return (
     <div className="p-8 space-y-6">
       {/* Header */}
@@ -33,6 +37,13 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
       {vehicle.specs && (
         <div className="card">
           <h2 className="text-xl font-semibold mb-4">Specifications</h2>
+          {vehicle.specs.make === 'Loading...' ? (
+            <div className="animate-pulse space-y-3">
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-4">
             {vehicle.specs.engine && (
               <div>
@@ -63,6 +74,7 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
               </div>
             )}
           </div>
+          )}
         </div>
       )}
 
@@ -130,23 +142,117 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
         </div>
       )}
 
-      {/* Recalls */}
-      {vehicle.safety?.recalls && vehicle.safety.recalls.length > 0 && (
+      {/* Recalls - Show "No Recalls" if empty */}
+      {vehicle.specs && vehicle.specs.make !== 'Loading...' && vehicle.safety && vehicle.safety.recalls.length === 0 && (
         <div className="card">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
-              {vehicle.safety.recalls.length}
+            <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
+              ✓
             </span>
-            Active Recalls
+            No Active Recalls
           </h2>
+          <p className="text-sm text-gray-600">This vehicle has no open safety recalls at this time.</p>
+        </div>
+      )}
+      {vehicle.safety?.recalls && vehicle.safety.recalls.length > 0 && (
+        <div className="card">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold flex items-center">
+              <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
+                {vehicle.safety.recalls.length}
+              </span>
+              Active Recalls
+            </h2>
+            {vehicle.safety.recalls.length > 3 && (
+              <button
+                onClick={() => {
+                  console.log('Toggling recalls:', !recallsExpanded);
+                  setRecallsExpanded(!recallsExpanded);
+                }}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+              >
+                {recallsExpanded ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                    Show Less
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    View All {vehicle.safety.recalls.length}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
           <div className="space-y-3">
-            {vehicle.safety.recalls.slice(0, 3).map((recall, idx) => (
-              <div key={idx} className="border-l-4 border-red-500 pl-4">
-                <p className="font-medium text-gray-900">{recall.Component}</p>
-                <p className="text-sm text-gray-600 mt-1">{recall.Summary}</p>
+            {(recallsExpanded ? vehicle.safety.recalls : vehicle.safety.recalls.slice(0, 3)).map((recall, idx) => (
+              <div key={idx} className="border-l-4 border-red-500 pl-4 py-2">
+                {recall.component && (
+                  <p className="font-medium text-gray-900">{recall.component}</p>
+                )}
+                {recall.summary && (
+                  <p className="text-sm text-gray-600 mt-1">{recall.summary}</p>
+                )}
+                {!recall.component && !recall.summary && (
+                  <p className="text-sm text-gray-500 italic">Details not available</p>
+                )}
+                {recallsExpanded && recall.consequence && (
+                  <p className="text-sm text-gray-700 mt-2">
+                    <span className="font-medium">Consequence:</span> {recall.consequence}
+                  </p>
+                )}
+                {recallsExpanded && recall.remedy && (
+                  <p className="text-sm text-gray-700 mt-2">
+                    <span className="font-medium">Remedy:</span> {recall.remedy}
+                  </p>
+                )}
                 <p className="text-xs text-gray-500 mt-1">
                   Campaign: {recall.NHTSACampaignNumber}
                 </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Consumer Complaints */}
+      {vehicle.specs && vehicle.specs.make !== 'Loading...' && vehicle.safety?.complaints && vehicle.safety.complaints.length > 0 && (
+        <div className="card">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold flex items-center">
+              <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
+                {vehicle.safety.complaints.length}
+              </span>
+              Consumer Complaints
+            </h2>
+            {vehicle.safety.complaints.length > 5 && (
+              <button
+                onClick={() => setComplaintsExpanded(!complaintsExpanded)}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                {complaintsExpanded ? 'Show Less' : `View All ${vehicle.safety.complaints.length}`}
+              </button>
+            )}
+          </div>
+          <div className="space-y-2">
+            {(complaintsExpanded ? vehicle.safety.complaints : vehicle.safety.complaints.slice(0, 5)).map((complaint, idx) => (
+              <div key={idx} className="border-l-4 border-yellow-500 pl-4">
+                <p className="text-sm text-gray-900">
+                  {complaintsExpanded ? complaint.summary : complaint.summary.substring(0, 120) + '...'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  ODI: {complaint.odiNumber}{complaint.dateOfIncident && ` • ${new Date(complaint.dateOfIncident).toLocaleDateString()}`}
+                </p>
+                {complaintsExpanded && complaint.components && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Components: {complaint.components}
+                  </p>
+                )}
               </div>
             ))}
           </div>

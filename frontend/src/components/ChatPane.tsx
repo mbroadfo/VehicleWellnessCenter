@@ -3,12 +3,14 @@ import { apiClient, type ChatMessage } from '../lib/api';
 
 interface ChatPaneProps {
   sessionId?: string;
+  vehicleId?: string;
   onSessionIdChange: (sessionId: string) => void;
   onVehicleUpdate: () => void;
 }
 
 export default function ChatPane({
   sessionId,
+  vehicleId,
   onSessionIdChange,
   onVehicleUpdate,
 }: ChatPaneProps) {
@@ -41,7 +43,7 @@ export default function ChatPane({
     setLoading(true);
 
     try {
-      const response = await apiClient.sendMessage(input, sessionId);
+      const response = await apiClient.sendMessage(input, sessionId, vehicleId);
 
       // Update session ID if this is the first message
       if (response.sessionId && !sessionId) {
@@ -50,24 +52,34 @@ export default function ChatPane({
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: response.response,
+        content: response.message,
         timestamp: new Date().toISOString(),
-        toolCalls: response.toolCalls,
+        toolCalls: response.toolsUsed?.map(name => ({ name, args: {}, result: undefined })),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
 
       // If the AI made tool calls, refresh the vehicle data
-      if (response.toolCalls && response.toolCalls.length > 0) {
+      if (response.toolsUsed && response.toolsUsed.length > 0) {
         // Small delay to let backend finish processing
         setTimeout(() => {
           onVehicleUpdate();
         }, 500);
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      let errorContent = 'Sorry, I encountered an error. Please try again.';
+      
+      // Handle rate limit errors
+      const err = error as { statusCode?: number; data?: { message?: string } };
+      if (err.statusCode === 429 || err.statusCode === 503) {
+        errorContent = err.data?.message || 'The AI service is temporarily busy. Please try again in a few seconds.';
+      } else if (error instanceof Error) {
+        errorContent = `Sorry, I encountered an error: ${error.message}`;
+      }
+
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: errorContent,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMessage]);

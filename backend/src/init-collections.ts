@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { getSecretsFromParameterStore } from "./lib/parameterStore.js";
+import { getSecretsFromParameterStore } from "./lib/parameterStore";
 
 async function initializeCollections(): Promise<void> {
   console.log("Retrieving secrets from Parameter Store...");

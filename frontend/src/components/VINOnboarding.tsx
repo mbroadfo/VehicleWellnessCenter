@@ -3,10 +3,9 @@ import { apiClient } from '../lib/api';
 
 interface VINOnboardingProps {
   onVehicleCreated: (vehicleId: string) => void;
-  onSessionIdCreated: (sessionId: string) => void;
 }
 
-export default function VINOnboarding({ onVehicleCreated, onSessionIdCreated }: VINOnboardingProps) {
+export default function VINOnboarding({ onVehicleCreated }: VINOnboardingProps) {
   const [vin, setVin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,22 +23,17 @@ export default function VINOnboarding({ onVehicleCreated, onSessionIdCreated }: 
 
     try {
       // Step 1: Create vehicle with VIN
-      const { vehicleId } = await apiClient.createVehicle({ vin });
+      const result = await apiClient.createVehicle({ vin });
+      const vehicleId = result.vehicleId;
       
-      // Step 2: Enrich with VIN decode
-      await apiClient.enrichVehicle(vehicleId, vin);
-      
-      // Step 3: Start chat session by sending initial message
-      const chatResponse = await apiClient.sendMessage(
-        `I just added my vehicle with VIN ${vin}. What information can you help me gather about it?`
-      );
-      
-      if (chatResponse.sessionId) {
-        onSessionIdCreated(chatResponse.sessionId);
-      }
-      
-      // Step 4: Notify parent
+      // Step 2: Notify parent immediately to show the vehicle dashboard
       onVehicleCreated(vehicleId);
+      
+      // Step 3: Start progressive enrichment in the background
+      // The parent component will show updates as each API completes
+      
+      // Note: Enrichment happens automatically via the dashboard's useEffect
+      // which calls each endpoint and updates the UI progressively
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add vehicle');

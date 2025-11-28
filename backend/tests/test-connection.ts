@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { getSecretsFromParameterStore } from "./lib/parameterStore.js";
+import { getSecretsFromParameterStore } from "../src/lib/parameterStore";
 
 async function testConnection(): Promise<void> {
   console.log("Retrieving secrets from Parameter Store...");
@@ -46,6 +46,21 @@ async function testConnection(): Promise<void> {
       collections.forEach((col: { name: string }) => {
         console.log(`  - ${col.name}`);
       });
+    }
+
+    // Check vehicle with VIN 1C4PJMBS9HW664582
+    const vehiclesCollection = vwcDb.collection("vehicles");
+    const vehicle = await vehiclesCollection.findOne({
+      "identification.vin": "1C4PJMBS9HW664582",
+    });
+    if (vehicle) {
+      console.log("\n🚗 Found vehicle with VIN 1C4PJMBS9HW664582:");
+      console.log(`  _id: ${vehicle._id}`);
+      console.log(`  ownership.ownerId: ${vehicle.ownership?.ownerId || "NOT SET"}`);
+      console.log(`  nickname: ${vehicle.nickname || "none"}`);
+      console.log(`  year/make/model: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
+    } else {
+      console.log("\n⚠️ No vehicle found with VIN 1C4PJMBS9HW664582");
     }
 
     console.log("\n✅ Connection test completed successfully!");

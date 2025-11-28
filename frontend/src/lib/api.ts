@@ -44,11 +44,13 @@ export interface SafetyData {
 
 export interface RecallData {
   NHTSACampaignNumber: string;
-  ReportReceivedDate: string;
-  Component: string;
-  Summary: string;
-  Consequence: string;
-  Remedy: string;
+  reportReceivedDate: string;
+  component: string;
+  summary: string;
+  consequence: string;
+  remedy: string;
+  manufacturer?: string;
+  notes?: string;
 }
 
 export interface ComplaintData {
@@ -125,13 +127,13 @@ export interface ChatMessage {
 
 export interface ChatResponse {
   success: boolean;
-  response: string;
-  sessionId?: string;
-  toolCalls?: Array<{
-    name: string;
-    args: Record<string, unknown>;
-    result?: unknown;
-  }>;
+  message: string; // Changed from 'response' to match backend
+  sessionId: string;
+  toolsUsed?: string[]; // Changed from 'toolCalls' to match backend
+  conversationContext?: {
+    messageCount: number;
+    historyUsed: number;
+  };
 }
 
 class APIClient {
@@ -165,14 +167,24 @@ class APIClient {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      const error = new Error(errorData.error || `HTTP ${response.status}`) as Error & {
+        statusCode?: number;
+        data?: typeof errorData;
+      };
+      error.statusCode = response.status;
+      error.data = errorData;
+      throw error;
     }
 
     return response.json();
   }
 
   // Vehicle endpoints
+  async listVehicles(): Promise<Vehicle[]> {
+    return this.request<Vehicle[]>('/vehicles');
+  }
+
   async createVehicle(data: { vin?: string; name?: string; year?: number; make?: string; model?: string }): Promise<{ vehicleId: string }> {
     // Create vehicle via MongoDB (this will be a new endpoint we add)
     const response = await this.request<{ _id: string }>('/vehicles', {
@@ -209,13 +221,13 @@ class APIClient {
   }
 
   // Chat endpoint
-  async sendMessage(message: string, sessionId?: string): Promise<ChatResponse> {
+  async sendMessage(message: string, sessionId?: string, vehicleId?: string): Promise<ChatResponse> {
     return this.request('/ai/chat', {
       method: 'POST',
       body: JSON.stringify({
         message,
         sessionId,
-        context: {},
+        vehicleId,
       }),
     });
   }

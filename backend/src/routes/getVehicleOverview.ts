@@ -82,32 +82,25 @@ export async function handler(
       .limit(5)
       .toArray();
 
-    // Build overview response
-    const overview: VehicleOverview = {
-      vehicleId: vehicle._id.toString(),
-      vin: vehicle.vin,
-      make: vehicle.attributes?.make as string | undefined,
-      model: vehicle.attributes?.model as string | undefined,
-      year: vehicle.attributes?.year as number | undefined,
-      odometer: vehicle.odometer?.current as number | undefined,
-      acquisitionDate: vehicle.acquisition?.date as string | undefined,
-      estimatedValue: vehicle.valuation?.estimatedValue as number | undefined,
-      eventCount,
-      recentEvents: recentEvents.map((event) => ({
-        _id: event._id.toString(),
-        type: event.type as string,
-        emoji: event.emoji as string | undefined,
-        occurredAt: event.occurredAt as string,
-        summary: event.summary as string,
-      })),
-      // TODO: Implement upcoming maintenance logic based on forecast field
-      upcomingMaintenance: [],
+    // Return full vehicle document for frontend
+    const response = {
+      _id: vehicle._id.toString(),
+      vin: (vehicle as any).identification?.vin || (vehicle as any).vin,
+      year: (vehicle as any).identification?.year,
+      make: (vehicle as any).identification?.make,
+      model: (vehicle as any).identification?.model,
+      specs: (vehicle as any).specs,
+      safety: (vehicle as any).safety,
+      fuelEconomy: (vehicle as any).fuelEconomy,
+      dealerPortal: (vehicle as any).dealerPortal,
+      createdAt: vehicle.createdAt,
+      lastUpdated: vehicle.updatedAt,
     };
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(overview),
+      body: JSON.stringify(response),
     };
   } catch (error) {
     console.error("Error in getVehicleOverview:", error);

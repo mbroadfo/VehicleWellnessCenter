@@ -68,7 +68,7 @@ export async function enrichVehicleHandler(
     }
 
     // Determine VIN to use (request body takes precedence)
-    let vin = requestBody.vin || vehicle.vin;
+    let vin = requestBody.vin || vehicle.identification?.vin;
 
     if (!vin) {
       return {
@@ -145,15 +145,16 @@ export async function enrichVehicleHandler(
     }
 
     // If VIN was provided in request and differs from stored, update it
-    if (requestBody.vin && requestBody.vin !== vehicle.vin) {
-      updateDoc.vin = vin;
+    if (requestBody.vin && requestBody.vin !== vehicle.identification?.vin) {
+      updateDoc['identification.vin'] = vin;
     }
 
     // Auto-populate year/make/model if not already set
-    if (specs.engine.manufacturer && !vehicle.make) {
-      // Try to extract make from engine manufacturer or use vPIC data
-      // Note: vPIC response includes Make/Model but we're not storing it in specs yet
-      // This will be enhanced when we store more vPIC data
+    if (specs.year && specs.make && specs.model) {
+      // Store year/make/model from vPIC data in identification
+      updateDoc['identification.year'] = specs.year;
+      updateDoc['identification.make'] = specs.make;
+      updateDoc['identification.model'] = specs.model;
     }
 
     const result = await vehiclesCollection.updateOne(

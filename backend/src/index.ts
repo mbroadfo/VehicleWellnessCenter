@@ -8,6 +8,7 @@ import { getVehicleSafetyHandler } from "./routes/getVehicleSafety";
 import { getConversationMessagesHandler } from "./routes/getConversationMessages";
 import { importDealerDataHandler } from "./routes/importDealerData";
 import { createVehicle } from "./routes/createVehicle";
+import { listVehicles } from "./routes/listVehicles";
 
 /**
  * Main Lambda Router
@@ -32,6 +33,10 @@ export const handler = async (
 
   try {
     // Route to appropriate handler
+    if (method === "GET" && path === "/vehicles") {
+      return await listVehicles(event);
+    }
+
     if (method === "POST" && path === "/vehicles") {
       return await createVehicle(event);
     }

@@ -9,22 +9,36 @@ import { getDatabase } from '../lib/mongodb';
  * Request body:
  * {
  *   "vin": "1HGCM82633A123456",
- *   "ownerId": "user_123",
  *   "nickname"?: "My Car"
  * }
+ * 
+ * The ownerId is automatically extracted from the authenticated user's JWT token.
  */
 export async function createVehicle(
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> {
   try {
     const body = JSON.parse(event.body || '{}');
-    const { vin, ownerId, nickname } = body;
+    const { vin, nickname } = body;
 
-    if (!vin || !ownerId) {
+    // Extract user ID from JWT token (provided by API Gateway JWT authorizer)
+    // @ts-expect-error - API Gateway v2 types don't include authorizer property correctly
+    const ownerId = event.requestContext.authorizer?.jwt?.claims?.sub as string;
+
+    if (!vin) {
       return {
         statusCode: 400,
         body: JSON.stringify({
-          error: 'Missing required fields: vin, ownerId',
+          error: 'Missing required field: vin',
+        }),
+      };
+    }
+
+    if (!ownerId) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({
+          error: 'User ID not found in token. Authentication required.',
         }),
       };
     }

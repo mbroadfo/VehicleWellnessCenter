@@ -55,8 +55,11 @@ export async function getVehicleSafetyHandler(
       };
     }
 
-    // Extract make, model, year from vehicle
-    const { make, model, year } = vehicle;
+    // Extract make, model, year from vehicle (check both nested and flat locations)
+    const vehicleAny = vehicle as any;
+    const make = vehicleAny.identification?.make || vehicleAny.specs?.make || vehicleAny.make;
+    const model = vehicleAny.identification?.model || vehicleAny.specs?.model || vehicleAny.model;
+    const year = vehicleAny.identification?.year || vehicleAny.specs?.year || vehicleAny.year;
 
     if (!make || !model || !year) {
       return {
@@ -64,6 +67,13 @@ export async function getVehicleSafetyHandler(
         body: JSON.stringify({
           success: false,
           error: 'Vehicle missing required fields: make, model, or year',
+          debug: {
+            make,
+            model,
+            year,
+            identification: vehicleAny.identification,
+            specs: vehicleAny.specs,
+          },
         }),
       };
     }
