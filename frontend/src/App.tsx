@@ -12,6 +12,9 @@ function App() {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loadingSpecs, setLoadingSpecs] = useState<Record<string, boolean>>({});
+  const [loadingSafety, setLoadingSafety] = useState<Record<string, boolean>>({});
+  const [loadingFuelEconomy, setLoadingFuelEconomy] = useState<Record<string, boolean>>({});
 
   // Redirect to Auth0 login if not authenticated
   useEffect(() => {
@@ -85,7 +88,7 @@ function App() {
       setActiveVehicleIndex(vehicles.length);
       setLoading(false);
       
-      // Progressive enrichment: Run each external API sequentially
+      // Progressive enrichment: Run each external API sequentially with visual feedback
       console.log('=== Starting Progressive Enrichment ===');
       
       if (!data.vin) {
@@ -94,6 +97,7 @@ function App() {
       }
       
       // Step 1: VIN Decode (NHTSA vPIC) - Vehicle Specifications
+      setLoadingSpecs(prev => ({ ...prev, [vehicleId]: true }));
       try {
         console.log('1/2: Fetching vehicle specifications (NHTSA vPIC)...');
         await apiClient.enrichVehicle(vehicleId, data.vin);
@@ -103,6 +107,8 @@ function App() {
       } catch (err) {
         console.error('✗ Failed to load specifications:', err);
         return;
+      } finally {
+        setLoadingSpecs(prev => ({ ...prev, [vehicleId]: false }));
       }
       
       // Check if we have required fields for remaining APIs
@@ -112,6 +118,7 @@ function App() {
       }
       
       // Step 2: Safety Data (NHTSA Recalls + Complaints + NCAP Ratings)
+      setLoadingSafety(prev => ({ ...prev, [vehicleId]: true }));
       try {
         console.log('2/2: Fetching safety data (Recalls, Complaints, NCAP)...');
         await apiClient.getSafetyData(vehicleId);
@@ -124,6 +131,8 @@ function App() {
         });
       } catch (err) {
         console.error('✗ Failed to load safety data:', err);
+      } finally {
+        setLoadingSafety(prev => ({ ...prev, [vehicleId]: false }));
       }
       
       // Note: Fuel economy is loaded during VIN enrichment
@@ -141,13 +150,68 @@ function App() {
 
   const handleVehicleUpdate = async () => {
     const activeVehicle = vehicles[activeVehicleIndex];
-    if (!activeVehicle?._id) return;
+    if (!activeVehicle?._id || !activeVehicle.vin) return;
     
+    // Refresh all data sources
     try {
+      // Refresh specs (includes fuel economy)
+      await handleRefreshSpecs();
+      
+      // Refresh safety data
+      await handleRefreshSafety();
+      
+      console.log('✓ All vehicle data refreshed');
+    } catch (err) {
+      console.error('Failed to refresh vehicle:', err);
+    }
+  };
+
+  const handleRefreshSpecs = async () => {
+    const activeVehicle = vehicles[activeVehicleIndex];
+    if (!activeVehicle?._id || !activeVehicle.vin) return;
+    
+    setLoadingSpecs(prev => ({ ...prev, [activeVehicle._id]: true }));
+    try {
+      await apiClient.enrichVehicle(activeVehicle._id, activeVehicle.vin);
       const data = await apiClient.getVehicle(activeVehicle._id);
       setVehicles(prev => prev.map(v => v._id === data._id ? data : v));
     } catch (err) {
-      console.error('Failed to refresh vehicle:', err);
+      console.error('Failed to refresh specs:', err);
+    } finally {
+      setLoadingSpecs(prev => ({ ...prev, [activeVehicle._id]: false }));
+    }
+  };
+
+  const handleRefreshSafety = async () => {
+    const activeVehicle = vehicles[activeVehicleIndex];
+    if (!activeVehicle?._id) return;
+    
+    setLoadingSafety(prev => ({ ...prev, [activeVehicle._id]: true }));
+    try {
+      await apiClient.getSafetyData(activeVehicle._id);
+      const data = await apiClient.getVehicle(activeVehicle._id);
+      setVehicles(prev => prev.map(v => v._id === data._id ? data : v));
+    } catch (err) {
+      console.error('Failed to refresh safety data:', err);
+    } finally {
+      setLoadingSafety(prev => ({ ...prev, [activeVehicle._id]: false }));
+    }
+  };
+
+  const handleRefreshFuelEconomy = async () => {
+    const activeVehicle = vehicles[activeVehicleIndex];
+    if (!activeVehicle?._id || !activeVehicle.vin) return;
+    
+    setLoadingFuelEconomy(prev => ({ ...prev, [activeVehicle._id]: true }));
+    try {
+      // Fuel economy is loaded as part of enrichVehicle
+      await apiClient.enrichVehicle(activeVehicle._id, activeVehicle.vin);
+      const data = await apiClient.getVehicle(activeVehicle._id);
+      setVehicles(prev => prev.map(v => v._id === data._id ? data : v));
+    } catch (err) {
+      console.error('Failed to refresh fuel economy:', err);
+    } finally {
+      setLoadingFuelEconomy(prev => ({ ...prev, [activeVehicle._id]: false }));
     }
   };
 
@@ -287,6 +351,12 @@ function App() {
               <VehicleReport 
                 vehicle={activeVehicle} 
                 onRefresh={handleVehicleUpdate}
+                onRefreshSpecs={handleRefreshSpecs}
+                onRefreshSafety={handleRefreshSafety}
+                onRefreshFuelEconomy={handleRefreshFuelEconomy}
+                loadingSpecs={loadingSpecs[activeVehicle._id]}
+                loadingSafety={loadingSafety[activeVehicle._id]}
+                loadingFuelEconomy={loadingFuelEconomy[activeVehicle._id]}
               />
             )}
           </div>

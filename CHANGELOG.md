@@ -4,6 +4,80 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Progressive Data Loading] - 2025-11-28
+
+### Added - Progressive Enrichment UI
+
+- **Frontend**: Dramatic progressive loading experience with real-time visual feedback
+  - Individual section refresh buttons for Specifications, Fuel Economy, and Safety Data
+  - Loading indicators with animated spinners and status messages ("Fetching from NHTSA vPIC...", "Fetching EPA data...", "Fetching recalls, complaints & ratings...")
+  - Skeleton loaders with gradient pulse animations (bg-linear-to-r from-primary-200 to-primary-100)
+  - Section-specific loading states tracked independently per vehicle
+  - "Refresh All" button orchestrates sequential refresh of both specs and safety APIs
+- **Frontend**: Per-vehicle loading state management in App.tsx
+  - Three loading state records: loadingSpecs, loadingSafety, loadingFuelEconomy (keyed by vehicleId)
+  - Refresh handlers: handleRefreshSpecs, handleRefreshSafety, handleRefreshFuelEconomy
+  - Progressive enrichment during vehicle creation with visual feedback at each API step
+  - Loading states set before API calls, cleared in finally blocks for reliability
+- **Frontend**: VehicleReport component completely rewritten (514 lines)
+  - Props: onRefreshSpecs, onRefreshSafety, onRefreshFuelEconomy handlers + loading flags
+  - Local state: refreshingSpecs, refreshingSafety, refreshingFuelEconomy for button feedback
+  - Computed loading states: Combines parent loading prop + local refreshing state + data availability
+  - Skeleton loaders replace static placeholders: structured gradients matching actual content layout
+  - Refresh buttons with SVG icons positioned in section headers
+  - Loading animations prevent multiple simultaneous refreshes
+
+### Changed - User Experience Improvements
+
+- **Frontend**: Enrichment flow now provides step-by-step visual feedback
+  - Step 1: VIN decode shows "Fetching from NHTSA vPIC..." with spinner
+  - Step 2: Safety data shows "Fetching recalls, complaints & ratings..." with spinner
+  - Each section updates independently as data arrives
+  - User can interact with loaded sections while others are still loading
+- **Frontend**: Refresh All button now actually refreshes all data
+  - Previous behavior: Only called getVehicle (re-fetched cached data)
+  - New behavior: Calls handleRefreshSpecs() then handleRefreshSafety() sequentially
+  - Both external APIs re-queried for latest data
+  - Loading indicators show progress for each step
+- **Frontend**: All sections now have individual refresh capabilities
+  - Specifications: Refresh VIN decode (includes fuel economy as side effect)
+  - Fuel Economy: Refresh VIN decode (dedicated button for clarity)
+  - Safety Data: Refresh recalls, complaints, and NCAP ratings together
+  - Each refresh button shows loading state independently
+
+### Technical Details - Progressive Loading
+
+- **Loading State Architecture**:
+  - Parent component (App.tsx): Tracks loading state for API calls (loadingSpecs, loadingSafety, loadingFuelEconomy)
+  - Child component (VehicleReport.tsx): Tracks button click state (refreshingSpecs, refreshingSafety, refreshingFuelEconomy)
+  - Computed state: isLoadingSpecs = loadingSpecs || refreshingSpecs || !vehicle.specs || vehicle.specs.make === 'Loading...'
+  - Prevents multiple refresh requests with combined state checks
+- **Skeleton Loader Design**:
+  - Gradient animations: bg-linear-to-r from-primary-200 to-primary-100 (TailwindCSS v4 syntax)
+  - Structural match: Skeleton divs mirror actual content layout (grid cols, spacing)
+  - Color scheme: Primary colors for active loading areas, gray for static placeholders
+  - Animation: Tailwind's animate-pulse utility for shimmer effect
+- **API Call Pattern**:
+  - enrichVehicle: Fetches specs + fuel economy (NHTSA vPIC)
+  - getSafetyData: Fetches recalls + complaints + NCAP ratings (3 APIs combined)
+  - Fuel economy refresh: Calls enrichVehicle (VIN decode includes EPA data)
+  - Each API sets loading state, updates vehicle document, clears loading state in finally block
+
+### Benefits - Progressive Loading
+
+- **User Engagement**: Visual drama during data loading creates sense of active processing
+- **Transparency**: Users see exactly which external APIs are being queried and when
+- **Responsiveness**: Sections appear as data arrives, not all-or-nothing loading
+- **Control**: Individual refresh buttons let users update specific data without full re-enrichment
+- **Performance**: Loading states prevent duplicate API calls during refresh operations
+
+### Known Issues - Progressive Loading
+
+- **Fuel Economy Button**: Calls enrichVehicle (VIN decode) even though EPA data already present
+  - Reason: EPA data is side effect of VIN decode, not separate API
+  - Impact: Minimal (VIN decode cached, fast refresh)
+  - Future: Could add dedicated EPA endpoint for targeted refresh
+
 ## [Frontend Cloud Deployment] - 2025-11-28
 
 ### Added - Cloud-Hosted Frontend

@@ -4,11 +4,63 @@ import type { Vehicle } from '../lib/api';
 interface VehicleReportProps {
   vehicle: Vehicle;
   onRefresh: () => void;
+  onRefreshSpecs?: () => Promise<void>;
+  onRefreshSafety?: () => Promise<void>;
+  onRefreshFuelEconomy?: () => Promise<void>;
+  loadingSpecs?: boolean;
+  loadingSafety?: boolean;
+  loadingFuelEconomy?: boolean;
 }
 
-export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps) {
+export default function VehicleReport({ 
+  vehicle, 
+  onRefresh,
+  onRefreshSpecs,
+  onRefreshSafety,
+  onRefreshFuelEconomy,
+  loadingSpecs = false,
+  loadingSafety = false,
+  loadingFuelEconomy = false
+}: VehicleReportProps) {
   const [recallsExpanded, setRecallsExpanded] = useState(false);
   const [complaintsExpanded, setComplaintsExpanded] = useState(false);
+  const [refreshingSpecs, setRefreshingSpecs] = useState(false);
+  const [refreshingSafety, setRefreshingSafety] = useState(false);
+  const [refreshingFuelEconomy, setRefreshingFuelEconomy] = useState(false);
+  
+  const handleRefreshSpecs = async () => {
+    if (!onRefreshSpecs) return;
+    setRefreshingSpecs(true);
+    try {
+      await onRefreshSpecs();
+    } finally {
+      setRefreshingSpecs(false);
+    }
+  };
+
+  const handleRefreshSafety = async () => {
+    if (!onRefreshSafety) return;
+    setRefreshingSafety(true);
+    try {
+      await onRefreshSafety();
+    } finally {
+      setRefreshingSafety(false);
+    }
+  };
+
+  const handleRefreshFuelEconomy = async () => {
+    if (!onRefreshFuelEconomy) return;
+    setRefreshingFuelEconomy(true);
+    try {
+      await onRefreshFuelEconomy();
+    } finally {
+      setRefreshingFuelEconomy(false);
+    }
+  };
+
+  const isLoadingSpecs = loadingSpecs || refreshingSpecs || !vehicle.specs || vehicle.specs.make === 'Loading...';
+  const isLoadingSafety = loadingSafety || refreshingSafety || !vehicle.safety;
+  const isLoadingFuelEconomy = loadingFuelEconomy || refreshingFuelEconomy || !vehicle.fuelEconomy?.epa;
   
   return (
     <div className="p-8 space-y-6">
@@ -24,28 +76,71 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
         </div>
         <button
           onClick={onRefresh}
-          className="btn-secondary"
-          title="Refresh vehicle data"
+          className="btn-secondary flex items-center gap-2"
+          title="Refresh all vehicle data"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
+          Refresh All
         </button>
       </div>
 
       {/* Vehicle Specifications */}
-      {vehicle.specs && (
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-4">Specifications</h2>
-          {vehicle.specs.make === 'Loading...' ? (
-            <div className="animate-pulse space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-              <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+      <div className="card">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold">Specifications</h2>
+            {isLoadingSpecs && (
+              <div className="flex items-center gap-2 text-primary-600 text-sm animate-pulse">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Fetching from NHTSA vPIC...</span>
+              </div>
+            )}
+          </div>
+          {onRefreshSpecs && !isLoadingSpecs && (
+            <button
+              onClick={handleRefreshSpecs}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+              title="Refresh specifications"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          )}
+        </div>
+        {isLoadingSpecs ? (
+          <div className="animate-pulse space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-6 bg-linear-to-r from-primary-200 to-primary-100 rounded w-2/3"></div>
             </div>
-          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-16"></div>
+                <div className="h-4 bg-gray-200 rounded w-32"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-20"></div>
+                <div className="h-4 bg-gray-200 rounded w-28"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-16"></div>
+                <div className="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-20"></div>
+                <div className="h-4 bg-gray-200 rounded w-28"></div>
+              </div>
+            </div>
+          </div>
+        ) : (
           <div className="grid grid-cols-2 gap-4">
-            {vehicle.specs.engine && (
+            {vehicle.specs?.engine && (
               <div>
                 <p className="text-sm text-gray-500">Engine</p>
                 <p className="font-medium">
@@ -55,7 +150,7 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
                 </p>
               </div>
             )}
-            {vehicle.specs.transmission && (
+            {vehicle.specs?.transmission && (
               <div>
                 <p className="text-sm text-gray-500">Transmission</p>
                 <p className="font-medium">
@@ -64,203 +159,284 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
                 </p>
               </div>
             )}
-            {vehicle.specs.drive && (
+            {vehicle.specs?.drive && (
               <div>
                 <p className="text-sm text-gray-500">Drivetrain</p>
                 <p className="font-medium">{vehicle.specs.drive}</p>
               </div>
             )}
-            {vehicle.specs.body?.style && (
+            {vehicle.specs?.body?.style && (
               <div>
                 <p className="text-sm text-gray-500">Body Style</p>
                 <p className="font-medium">{vehicle.specs.body.style}</p>
               </div>
             )}
           </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Fuel Economy */}
-      {vehicle.fuelEconomy?.epa && (
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-4">Fuel Economy</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary-600">
-                {vehicle.fuelEconomy.epa.city}
+      <div className="card">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold">Fuel Economy</h2>
+            {isLoadingFuelEconomy && (
+              <div className="flex items-center gap-2 text-primary-600 text-sm animate-pulse">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Fetching EPA data...</span>
               </div>
-              <div className="text-sm text-gray-500">City MPG</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary-600">
-                {vehicle.fuelEconomy.epa.highway}
-              </div>
-              <div className="text-sm text-gray-500">Highway MPG</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary-600">
-                {vehicle.fuelEconomy.epa.combined}
-              </div>
-              <div className="text-sm text-gray-500">Combined MPG</div>
-            </div>
+            )}
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between text-sm">
-            <span className="text-gray-600">Annual Fuel Cost:</span>
-            <span className="font-semibold">${vehicle.fuelEconomy.epa.annualFuelCost}</span>
-          </div>
+          {onRefreshFuelEconomy && !isLoadingFuelEconomy && (
+            <button
+              onClick={handleRefreshFuelEconomy}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+              title="Refresh fuel economy"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          )}
         </div>
-      )}
+        {isLoadingFuelEconomy ? (
+          <div className="animate-pulse space-y-3">
+            <div className="grid grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="text-center space-y-2">
+                  <div className="h-10 bg-linear-to-r from-primary-200 to-primary-100 rounded w-16 mx-auto"></div>
+                  <div className="h-3 bg-gray-200 rounded w-20 mx-auto"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary-600">
+                  {vehicle.fuelEconomy?.epa?.city}
+                </div>
+                <div className="text-sm text-gray-500">City MPG</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary-600">
+                  {vehicle.fuelEconomy?.epa?.highway}
+                </div>
+                <div className="text-sm text-gray-500">Highway MPG</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary-600">
+                  {vehicle.fuelEconomy?.epa?.combined}
+                </div>
+                <div className="text-sm text-gray-500">Combined MPG</div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between text-sm">
+              <span className="text-gray-600">Annual Fuel Cost:</span>
+              <span className="font-semibold">${vehicle.fuelEconomy?.epa?.annualFuelCost}</span>
+            </div>
+          </>
+        )}
+      </div>
 
-      {/* Safety Ratings */}
-      {vehicle.safety?.ncapRating && (
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-4">NCAP Safety Ratings</h2>
-          <div className="grid grid-cols-2 gap-4">
+      {/* Safety Data */}
+      <div className="card">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold">Safety Data</h2>
+            {isLoadingSafety && (
+              <div className="flex items-center gap-2 text-primary-600 text-sm animate-pulse">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Fetching recalls, complaints & ratings...</span>
+              </div>
+            )}
+          </div>
+          {onRefreshSafety && !isLoadingSafety && (
+            <button
+              onClick={handleRefreshSafety}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+              title="Refresh safety data"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          )}
+        </div>
+        
+        {isLoadingSafety ? (
+          <div className="space-y-6 animate-pulse">
+            {/* Loading skeleton for ratings */}
             <div>
-              <p className="text-sm text-gray-500">Overall</p>
-              <div className="flex items-center">
-                <StarRating rating={vehicle.safety.ncapRating.overall} />
+              <div className="h-5 bg-gray-200 rounded w-32 mb-4"></div>
+              <div className="grid grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-3 bg-gray-200 rounded w-20"></div>
+                    <div className="h-4 bg-linear-to-r from-yellow-200 to-yellow-100 rounded w-32"></div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Side</p>
-              <div className="flex items-center">
-                <StarRating rating={vehicle.safety.ncapRating.side} />
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Front Driver</p>
-              <div className="flex items-center">
-                <StarRating rating={vehicle.safety.ncapRating.frontDriver} />
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Rollover</p>
-              <div className="flex items-center">
-                <StarRating rating={vehicle.safety.ncapRating.rollover} />
-              </div>
+            {/* Loading skeleton for recalls */}
+            <div className="space-y-3 pt-6 border-t">
+              <div className="h-5 bg-gray-200 rounded w-40"></div>
+              <div className="h-4 bg-gray-200 rounded w-full"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <>
+            {/* Safety Ratings */}
+            {vehicle.safety?.ncapRating && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4">NCAP Safety Ratings</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Overall</p>
+                    <StarRating rating={vehicle.safety.ncapRating.overall} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Side</p>
+                    <StarRating rating={vehicle.safety.ncapRating.side} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Front Driver</p>
+                    <StarRating rating={vehicle.safety.ncapRating.frontDriver} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Rollover</p>
+                    <StarRating rating={vehicle.safety.ncapRating.rollover} />
+                  </div>
+                </div>
+              </div>
+            )}
 
-      {/* Recalls - Show "No Recalls" if empty */}
-      {vehicle.specs && vehicle.specs.make !== 'Loading...' && vehicle.safety && vehicle.safety.recalls.length === 0 && (
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
-              ✓
-            </span>
-            No Active Recalls
-          </h2>
-          <p className="text-sm text-gray-600">This vehicle has no open safety recalls at this time.</p>
-        </div>
-      )}
-      {vehicle.safety?.recalls && vehicle.safety.recalls.length > 0 && (
-        <div className="card">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold flex items-center">
-              <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
-                {vehicle.safety.recalls.length}
-              </span>
-              Active Recalls
-            </h2>
-            {vehicle.safety.recalls.length > 3 && (
-              <button
-                onClick={() => {
-                  console.log('Toggling recalls:', !recallsExpanded);
-                  setRecallsExpanded(!recallsExpanded);
-                }}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-              >
-                {recallsExpanded ? (
+            {/* Recalls */}
+            {vehicle.safety && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                {vehicle.safety.recalls.length === 0 ? (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                    Show Less
+                    <h3 className="text-lg font-semibold mb-2 flex items-center">
+                      <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
+                        ✓
+                      </span>
+                      No Active Recalls
+                    </h3>
+                    <p className="text-sm text-gray-600">This vehicle has no open safety recalls at this time.</p>
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                    View All {vehicle.safety.recalls.length}
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-semibold flex items-center">
+                        <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
+                          {vehicle.safety.recalls.length}
+                        </span>
+                        Active Recalls
+                      </h3>
+                      {vehicle.safety.recalls.length > 3 && (
+                        <button
+                          onClick={() => setRecallsExpanded(!recallsExpanded)}
+                          className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                        >
+                          {recallsExpanded ? (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                              View All {vehicle.safety.recalls.length}
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-3">
+                      {(recallsExpanded ? vehicle.safety.recalls : vehicle.safety.recalls.slice(0, 3)).map((recall, idx) => (
+                        <div key={idx} className="border-l-4 border-red-500 pl-4 py-2">
+                          {recall.component && (
+                            <p className="font-medium text-gray-900">{recall.component}</p>
+                          )}
+                          {recall.summary && (
+                            <p className="text-sm text-gray-600 mt-1">{recall.summary}</p>
+                          )}
+                          {recallsExpanded && recall.consequence && (
+                            <p className="text-sm text-gray-700 mt-2">
+                              <span className="font-medium">Consequence:</span> {recall.consequence}
+                            </p>
+                          )}
+                          {recallsExpanded && recall.remedy && (
+                            <p className="text-sm text-gray-700 mt-2">
+                              <span className="font-medium">Remedy:</span> {recall.remedy}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Campaign: {recall.NHTSACampaignNumber}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </>
                 )}
-              </button>
-            )}
-          </div>
-          <div className="space-y-3">
-            {(recallsExpanded ? vehicle.safety.recalls : vehicle.safety.recalls.slice(0, 3)).map((recall, idx) => (
-              <div key={idx} className="border-l-4 border-red-500 pl-4 py-2">
-                {recall.component && (
-                  <p className="font-medium text-gray-900">{recall.component}</p>
-                )}
-                {recall.summary && (
-                  <p className="text-sm text-gray-600 mt-1">{recall.summary}</p>
-                )}
-                {!recall.component && !recall.summary && (
-                  <p className="text-sm text-gray-500 italic">Details not available</p>
-                )}
-                {recallsExpanded && recall.consequence && (
-                  <p className="text-sm text-gray-700 mt-2">
-                    <span className="font-medium">Consequence:</span> {recall.consequence}
-                  </p>
-                )}
-                {recallsExpanded && recall.remedy && (
-                  <p className="text-sm text-gray-700 mt-2">
-                    <span className="font-medium">Remedy:</span> {recall.remedy}
-                  </p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Campaign: {recall.NHTSACampaignNumber}
-                </p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
-      {/* Consumer Complaints */}
-      {vehicle.specs && vehicle.specs.make !== 'Loading...' && vehicle.safety?.complaints && vehicle.safety.complaints.length > 0 && (
-        <div className="card">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold flex items-center">
-              <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
-                {vehicle.safety.complaints.length}
-              </span>
-              Consumer Complaints
-            </h2>
-            {vehicle.safety.complaints.length > 5 && (
-              <button
-                onClick={() => setComplaintsExpanded(!complaintsExpanded)}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                {complaintsExpanded ? 'Show Less' : `View All ${vehicle.safety.complaints.length}`}
-              </button>
-            )}
-          </div>
-          <div className="space-y-2">
-            {(complaintsExpanded ? vehicle.safety.complaints : vehicle.safety.complaints.slice(0, 5)).map((complaint, idx) => (
-              <div key={idx} className="border-l-4 border-yellow-500 pl-4">
-                <p className="text-sm text-gray-900">
-                  {complaintsExpanded ? complaint.summary : complaint.summary.substring(0, 120) + '...'}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  ODI: {complaint.odiNumber}{complaint.dateOfIncident && ` • ${new Date(complaint.dateOfIncident).toLocaleDateString()}`}
-                </p>
-                {complaintsExpanded && complaint.components && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    Components: {complaint.components}
-                  </p>
-                )}
+            {/* Complaints */}
+            {vehicle.safety?.complaints && vehicle.safety.complaints.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold flex items-center">
+                    <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded mr-2">
+                      {vehicle.safety.complaints.length}
+                    </span>
+                    Consumer Complaints
+                  </h3>
+                  {vehicle.safety.complaints.length > 5 && (
+                    <button
+                      onClick={() => setComplaintsExpanded(!complaintsExpanded)}
+                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      {complaintsExpanded ? 'Show Less' : `View All ${vehicle.safety.complaints.length}`}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {(complaintsExpanded ? vehicle.safety.complaints : vehicle.safety.complaints.slice(0, 5)).map((complaint, idx) => (
+                    <div key={idx} className="border-l-4 border-yellow-500 pl-4">
+                      <p className="text-sm text-gray-900">
+                        {complaintsExpanded ? complaint.summary : complaint.summary.substring(0, 120) + '...'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        ODI: {complaint.odiNumber}{complaint.dateOfIncident && ` • ${new Date(complaint.dateOfIncident).toLocaleDateString()}`}
+                      </p>
+                      {complaintsExpanded && complaint.components && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          Components: {complaint.components}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </div>
 
       {/* Dealer Portal Data */}
       {vehicle.dealerPortal && (
@@ -311,15 +487,6 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
           <p className="text-xs text-gray-500 mt-4">
             Source: {vehicle.dealerPortal.source} • 
             Last synced: {new Date(vehicle.dealerPortal.lastSync).toLocaleDateString()}
-          </p>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!vehicle.specs && !vehicle.safety && !vehicle.fuelEconomy && !vehicle.dealerPortal && (
-        <div className="card text-center py-12">
-          <p className="text-gray-500">
-            No data available yet. Chat with the assistant to gather vehicle information.
           </p>
         </div>
       )}
