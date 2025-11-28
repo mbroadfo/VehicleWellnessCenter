@@ -30,7 +30,10 @@ export interface VehicleSpecs {
     style?: string;
     doors?: number;
   };
-  transmission?: string;
+  transmission?: {
+    type: string;
+    speeds?: number;
+  };
   drive?: string;
   decodedAt: string;
 }

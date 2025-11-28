@@ -16,7 +16,7 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {vehicle.year} {vehicle.make} {vehicle.model}
+            {vehicle.specs?.year || vehicle.year} {vehicle.specs?.make || vehicle.make} {vehicle.specs?.model || vehicle.model}
           </h1>
           {vehicle.vin && (
             <p className="text-sm text-gray-500 mt-1">VIN: {vehicle.vin}</p>
@@ -58,7 +58,10 @@ export default function VehicleReport({ vehicle, onRefresh }: VehicleReportProps
             {vehicle.specs.transmission && (
               <div>
                 <p className="text-sm text-gray-500">Transmission</p>
-                <p className="font-medium">{vehicle.specs.transmission}</p>
+                <p className="font-medium">
+                  {vehicle.specs.transmission.type}
+                  {vehicle.specs.transmission.speeds && ` (${vehicle.specs.transmission.speeds}-speed)`}
+                </p>
               </div>
             )}
             {vehicle.specs.drive && (

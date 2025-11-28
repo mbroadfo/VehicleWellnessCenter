@@ -61,17 +61,19 @@ function App() {
     try {
       setLoading(true);
       
-      // Load initial vehicle data with loading placeholders
+      // Load initial vehicle data
       let data = await apiClient.getVehicle(vehicleId);
+      
+      // Ensure specs has proper structure (not nested objects that could render)
       const newVehicle: Vehicle = {
         ...data,
-        specs: { 
+        specs: data.specs || { 
           make: 'Loading...', 
           model: '', 
           year: new Date().getFullYear(),
           decodedAt: new Date().toISOString() 
         },
-        safety: {
+        safety: data.safety || {
           recalls: [],
           complaints: [],
           lastChecked: new Date().toISOString()
