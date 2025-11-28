@@ -30,6 +30,9 @@
     "infra:apply": "node infra/load-tf-env.js terraform apply -auto-approve",
     "infra:destroy": "node infra/load-tf-env.js terraform destroy",
     "deploy": "npm run build:lambda && aws lambda update-function-code --function-name vwc-dev --zip-file fileb://infra/lambda-vwc.zip --profile terraform-vwc --region us-west-2",
+    "deploy:backend": "npm run deploy",
+    "deploy:frontend": "npm run build:frontend && aws s3 sync frontend/dist/ s3://vwc-frontend-dev/ --delete --profile terraform-vwc --region us-west-2 && aws cloudfront create-invalidation --distribution-id E36T027C39MTRV --paths \"/*\" --profile terraform-vwc",
+    "deploy:all": "npm run deploy:backend && npm run deploy:frontend",
     "clean": "npm run clean --workspaces --if-present",
     "clean:all": "npm run clean && rm -rf node_modules backend/node_modules frontend/node_modules"
   },

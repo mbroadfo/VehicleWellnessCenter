@@ -4,6 +4,107 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Frontend Cloud Deployment] - 2025-11-28
+
+### Added - Cloud-Hosted Frontend
+
+- **Frontend**: S3 + CloudFront deployment infrastructure via Terraform
+  - S3 bucket `vwc-frontend-dev` with static website hosting
+  - CloudFront distribution with Origin Access Control (OAC) for secure S3 access
+  - Custom error responses for SPA routing (404/403 → 200 /index.html)
+  - Cache TTL: 0 min / 3600 default / 86400 max
+  - PriceClass_100 (US, Canada, Europe)
+  - Public URL: <https://dgs070mgszb6.cloudfront.net>
+- **Frontend**: Single dashboard page architecture (eliminated login/onboarding pages)
+  - Auto-redirect to Auth0 Universal Login when not authenticated
+  - Empty state for zero vehicles with call-to-action button
+  - Single vehicle view (no tabs) when user has 1 vehicle
+  - Tabbed interface when user has 2+ vehicles (year/make/model labels)
+  - "Add Vehicle" button in header (always visible)
+  - Modal dialog for VIN entry (replaces full-page onboarding)
+- **Frontend**: AddVehicleModal component
+  - Modal dialog with backdrop overlay
+  - 17-character VIN validation with real-time counter
+  - Calls createVehicle API and triggers progressive enrichment
+  - Automatically switches to new vehicle tab after creation
+  - Cancel and submit buttons with loading states
+- **Infrastructure**: IAM policy updates for S3 and CloudFront management
+  - S3BucketManagement: 24 actions (create/delete bucket, manage policy/website/tags/ACL)
+  - S3ObjectManagement: 3 actions (put/get/delete objects)
+  - CloudFrontManagement: 14 actions (distributions, OAC, invalidations)
+  - Resource scoped to `vwc-frontend-*` buckets
+- **DevOps**: Simplified deployment scripts
+  - `npm run deploy:frontend` - Build, sync to S3, invalidate CloudFront cache
+  - `npm run deploy:backend` - Update Lambda function code
+  - `npm run deploy:all` - Deploy both frontend and backend
+  - `npm run infra:apply` - Apply Terraform infrastructure changes
+- **Documentation**: Complete deployment guide (`DEPLOYMENT.md`)
+  - Quick deploy commands for common workflows
+  - Infrastructure management (plan/apply/destroy)
+  - Auth0 configuration instructions
+  - Troubleshooting steps for CloudFront cache and Lambda issues
+  - Performance metrics (5s backend, 10s frontend, 3-5min infrastructure)
+  - Cost optimization notes (free tier limits)
+
+### Changed - User Experience
+
+- **Frontend**: Multi-vehicle support with tab navigation
+  - Changed from single vehicle state to vehicles:Vehicle[] array
+  - activeVehicleIndex tracks currently selected tab
+  - Tab labels: "{year} {make} {model}" or VIN or "Vehicle N"
+  - Active tab highlighted with blue border-bottom
+  - Only shows tabs when vehicles.length > 1 (cleaner UI for single vehicle)
+- **Frontend**: Progressive enrichment on vehicle creation
+  - Adds vehicle to array immediately with "Loading..." placeholders
+  - Switches to new vehicle tab before enrichment starts
+  - Updates vehicle data in array as each API completes
+  - Console logging with checkmarks for user feedback
+  - Non-blocking: other vehicles remain accessible during enrichment
+
+### Infrastructure - Phase 14 Deployment
+
+- Terraform resources created:
+  - `aws_s3_bucket.frontend` - vwc-frontend-dev
+  - `aws_s3_bucket_public_access_block.frontend` - All public access blocked
+  - `aws_s3_bucket_website_configuration.frontend` - index.html + SPA routing
+  - `aws_cloudfront_origin_access_control.frontend` - OAC with sigv4 signing
+  - `aws_cloudfront_distribution.frontend` - Distribution E36T027C39MTRV
+  - `aws_s3_bucket_policy.frontend` - CloudFront service principal access
+- Terraform outputs:
+  - cloudfront_url: <https://dgs070mgszb6.cloudfront.net>
+  - cloudfront_distribution_id: E36T027C39MTRV
+  - s3_bucket_name: vwc-frontend-dev
+- Frontend deployed: 4 files synced (index.html, CSS, JS, vite.svg)
+- CloudFront cache invalidated: /*
+
+### Security - Auth0 Configuration
+
+- CloudFront URL added to Auth0 application settings:
+  - Allowed Callback URLs: `https://dgs070mgszb6.cloudfront.net/callback`
+  - Allowed Logout URLs: `https://dgs070mgszb6.cloudfront.net`
+  - Allowed Web Origins: `https://dgs070mgszb6.cloudfront.net`
+- JWT validation working correctly with Auth0
+- No secrets in frontend code (Auth0 domain/clientId are public)
+
+### Technical Notes - Cloud Deployment
+
+- CloudFront creation time: ~3 minutes
+- S3 sync time: ~2 seconds (4 files)
+- Cache invalidation time: ~1-2 minutes
+- CloudFront OAC replaces legacy Origin Access Identity (OAI)
+- SPA routing via custom error responses (404/403 → 200 index.html)
+- Cache invalidation automatically included in `deploy:frontend` script
+- Distribution ID hardcoded in package.json for fast deploys (E36T027C39MTRV)
+
+### Benefits - Cloud Deployment
+
+- **No local dev server**: Production-only deployment model
+- **Global CDN**: CloudFront edge locations for low latency
+- **Automatic cache invalidation**: Always serves latest frontend code
+- **Simplified architecture**: No separate login/onboarding pages
+- **Multi-vehicle support**: Tabs for users with multiple vehicles
+- **Progressive disclosure**: Empty state → single view → tabs (scales with data)
+
 ## [Auth0 Authentication & Progressive Enrichment] - 2025-11-25
 
 ### Added - Auth0 Universal Login Integration

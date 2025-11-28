@@ -3,14 +3,22 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { apiClient, type Vehicle } from './lib/api';
 import VehicleReport from './components/VehicleReport';
 import ChatPane from './components/ChatPane';
-import VINOnboarding from './components/VINOnboarding';
+import AddVehicleModal from './components/AddVehicleModal';
 
 function App() {
   const { isLoading, isAuthenticated, error: authError, loginWithRedirect, logout, getAccessTokenSilently, user } = useAuth0();
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [activeVehicleIndex, setActiveVehicleIndex] = useState(0);
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // Redirect to Auth0 login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !authError) {
+      loginWithRedirect();
+    }
+  }, [isLoading, isAuthenticated, authError, loginWithRedirect]);
 
   // Get Auth0 token and load vehicles
   useEffect(() => {
@@ -24,20 +32,20 @@ function App() {
         
         // Step 2: Load user's vehicles
         setLoading(true);
-        const vehicles = await apiClient.listVehicles();
+        const vehicleList = await apiClient.listVehicles();
         
-        if (vehicles.length > 0) {
-          // Load the first vehicle with full details
-          const fullVehicle = await apiClient.getVehicle(vehicles[0]._id);
-          setVehicle(fullVehicle);
-        }
+        // Step 3: Load full details for all vehicles
+        const fullVehicles = await Promise.all(
+          vehicleList.map(v => apiClient.getVehicle(v._id))
+        );
+        
+        setVehicles(fullVehicles);
       } catch (err) {
         console.error('Failed to initialize:', err);
         const errorMsg = (err as Error).message;
         if (errorMsg.includes('Refresh Token') || errorMsg.includes('Authentication')) {
           // Clear stale auth data and force re-login
           localStorage.clear();
-          setError('Session expired. Please log in again.');
           logout({ logoutParams: { returnTo: window.location.origin } });
           return;
         }
@@ -49,14 +57,13 @@ function App() {
     init();
   }, [isAuthenticated, getAccessTokenSilently, logout]);
 
-  const handleVehicleCreated = async (vehicleId: string) => {
+  const handleVehicleAdded = async (vehicleId: string) => {
     try {
       setLoading(true);
-      setError(null);
       
-      // Load initial vehicle data with loading placeholders for all sections
+      // Load initial vehicle data with loading placeholders
       let data = await apiClient.getVehicle(vehicleId);
-      setVehicle({
+      const newVehicle: Vehicle = {
         ...data,
         specs: { 
           make: 'Loading...', 
@@ -69,7 +76,11 @@ function App() {
           complaints: [],
           lastChecked: new Date().toISOString()
         }
-      });
+      };
+      
+      // Add to vehicles array and switch to it
+      setVehicles(prev => [...prev, newVehicle]);
+      setActiveVehicleIndex(vehicles.length);
       setLoading(false);
       
       // Progressive enrichment: Run each external API sequentially
@@ -85,11 +96,11 @@ function App() {
         console.log('1/2: Fetching vehicle specifications (NHTSA vPIC)...');
         await apiClient.enrichVehicle(vehicleId, data.vin);
         data = await apiClient.getVehicle(vehicleId);
-        setVehicle(data);
+        setVehicles(prev => prev.map(v => v._id === vehicleId ? data : v));
         console.log('✓ Specifications loaded:', data.specs?.make, data.specs?.model);
       } catch (err) {
         console.error('✗ Failed to load specifications:', err);
-        return; // Can't continue without specs
+        return;
       }
       
       // Check if we have required fields for remaining APIs
@@ -103,7 +114,7 @@ function App() {
         console.log('2/2: Fetching safety data (Recalls, Complaints, NCAP)...');
         await apiClient.getSafetyData(vehicleId);
         data = await apiClient.getVehicle(vehicleId);
-        setVehicle(data);
+        setVehicles(prev => prev.map(v => v._id === vehicleId ? data : v));
         console.log('✓ Safety data loaded:', {
           recalls: data.safety?.recalls?.length || 0,
           complaints: data.safety?.complaints?.length || 0,
@@ -113,26 +124,26 @@ function App() {
         console.error('✗ Failed to load safety data:', err);
       }
       
-      // Note: Fuel economy is loaded during VIN enrichment (stored in vehicle.fuelEconomy)
+      // Note: Fuel economy is loaded during VIN enrichment
       if (data.fuelEconomy?.epa) {
         console.log('✓ Fuel economy data available:', data.fuelEconomy.epa);
       }
       
       console.log('=== Enrichment Complete - All External APIs Processed ===');
-      console.log('AI chat is now available in the right panel.');
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load vehicle');
+      console.error('Failed to load vehicle:', err);
       setLoading(false);
     }
   };
 
   const handleVehicleUpdate = async () => {
-    if (!vehicle?._id) return;
+    const activeVehicle = vehicles[activeVehicleIndex];
+    if (!activeVehicle?._id) return;
     
     try {
-      const data = await apiClient.getVehicle(vehicle._id);
-      setVehicle(data);
+      const data = await apiClient.getVehicle(activeVehicle._id);
+      setVehicles(prev => prev.map(v => v._id === data._id ? data : v));
     } catch (err) {
       console.error('Failed to refresh vehicle:', err);
     }
@@ -165,93 +176,31 @@ function App() {
     );
   }
 
-  // Show login screen if not authenticated
+  // If not authenticated, Auth0 redirect happens in useEffect above
   if (!isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-primary-50 to-primary-100">
-        <div className="card max-w-md text-center">
-          <h1 className="text-3xl font-bold text-primary-900 mb-4">Vehicle Wellness Center</h1>
-          <p className="text-gray-600 mb-6">
-            Track maintenance, safety recalls, and get AI-powered insights for your vehicles
-          </p>
-          <button 
-            onClick={() => loginWithRedirect()}
-            className="btn-primary w-full"
-          >
-            Log In
-          </button>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirecting to login...</p>
         </div>
       </div>
     );
   }
 
+  // Show loading while fetching vehicles
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading vehicle data...</p>
+          <p className="mt-4 text-gray-600">Loading your vehicles...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="card max-w-md">
-          <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
-          <p className="text-gray-700">{error}</p>
-          <button 
-            onClick={() => setError(null)} 
-            className="btn-primary mt-4"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!vehicle) {
-    // Show blank screen while loading to avoid unauthorized API calls
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading your vehicles...</p>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="h-screen flex flex-col">
-        {/* Header */}
-        <header className="bg-primary-700 text-white p-4 shadow-md">
-          <div className="container mx-auto flex justify-between items-center">
-            <h1 className="text-xl font-bold">Vehicle Wellness Center</h1>
-            <div className="flex items-center gap-4">
-              <span className="text-sm">{user?.email}</span>
-              <button 
-                onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} 
-                className="px-3 py-1 bg-primary-600 hover:bg-primary-500 rounded text-sm"
-              >
-                Log Out
-              </button>
-            </div>
-          </div>
-        </header>
-        {/* VIN Onboarding */}
-        <div className="flex-1">
-          <VINOnboarding 
-            onVehicleCreated={handleVehicleCreated}
-          />
-        </div>
-      </div>
-    );
-  }
+  const activeVehicle = vehicles[activeVehicleIndex];
 
   return (
     <div className="h-screen flex flex-col">
@@ -260,6 +209,15 @@ function App() {
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">Vehicle Wellness Center</h1>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Vehicle
+            </button>
             <span className="text-sm">{user?.email}</span>
             <button 
               onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} 
@@ -270,26 +228,87 @@ function App() {
           </div>
         </div>
       </header>
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden bg-gray-100">
-      {/* Left Pane - Vehicle Report */}
-      <div className="w-2/3 overflow-y-auto border-r border-gray-300">
-        <VehicleReport 
-          vehicle={vehicle} 
-          onRefresh={handleVehicleUpdate}
-        />
-      </div>
 
-      {/* Right Pane - Chat */}
-      <div className="w-1/3 flex flex-col">
-        <ChatPane 
-          sessionId={sessionId}
-          vehicleId={vehicle?._id}
-          onSessionIdChange={setSessionId}
-          onVehicleUpdate={handleVehicleUpdate}
-        />
-      </div>
-      </div>
+      {/* Vehicle Tabs */}
+      {vehicles.length > 0 && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="container mx-auto">
+            <div className="flex gap-2 px-4">
+              {vehicles.map((vehicle, index) => {
+                const displayName = vehicle.specs?.make && vehicle.specs?.model
+                  ? `${vehicle.specs.year || ''} ${vehicle.specs.make} ${vehicle.specs.model}`.trim()
+                  : vehicle.vin || `Vehicle ${index + 1}`;
+                
+                return (
+                  <button
+                    key={vehicle._id}
+                    onClick={() => setActiveVehicleIndex(index)}
+                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                      index === activeVehicleIndex
+                        ? 'border-primary-600 text-primary-600'
+                        : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                    }`}
+                  >
+                    {displayName}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      {vehicles.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="text-center max-w-md mx-auto px-4">
+            <svg className="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+            </svg>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">No Vehicles Yet</h2>
+            <p className="text-gray-600 mb-6">
+              Get started by adding your first vehicle. We'll decode the VIN and gather safety data automatically.
+            </p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="btn-primary"
+            >
+              Add Your First Vehicle
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden bg-gray-100">
+          {/* Left Pane - Vehicle Report */}
+          <div className="w-2/3 overflow-y-auto border-r border-gray-300">
+            {activeVehicle && (
+              <VehicleReport 
+                vehicle={activeVehicle} 
+                onRefresh={handleVehicleUpdate}
+              />
+            )}
+          </div>
+
+          {/* Right Pane - Chat */}
+          <div className="w-1/3 flex flex-col">
+            {activeVehicle && (
+              <ChatPane 
+                sessionId={sessionId}
+                vehicleId={activeVehicle._id}
+                onSessionIdChange={setSessionId}
+                onVehicleUpdate={handleVehicleUpdate}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Vehicle Modal */}
+      <AddVehicleModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onVehicleAdded={handleVehicleAdded}
+      />
     </div>
   );
 }
