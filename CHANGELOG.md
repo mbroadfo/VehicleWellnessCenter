@@ -4,6 +4,83 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Vehicle Delete Feature] - 2025-11-28
+
+### Added - Vehicle Deletion
+
+- **Backend**: DELETE /vehicles/{vehicleId} endpoint (`backend/src/routes/deleteVehicle.ts`)
+  - Deletes vehicle and all related data: vehicle document, events, conversation sessions & messages
+  - **Security**: Verifies vehicle ownership via JWT token (ownership.ownerId check)
+  - Returns 204 No Content on success
+  - Validates ObjectId format and vehicle existence
+  - Logs deletion summary (vehicle count, events count, sessions count, VIN)
+- **Frontend**: Delete button with confirmation modal
+  - Red "Delete" button in vehicle header (next to Refresh All)
+  - Trash icon SVG with clear visual hierarchy
+  - `ConfirmDeleteModal` component with warning UI:
+    - Red warning icon and bold heading
+    - Lists all data that will be deleted (vehicle, events, conversations)
+    - "Cannot be undone" warning in red text
+    - Cancel/Delete buttons with distinct styling
+  - Success toast notification with vehicle name
+  - Auto-adjusts active vehicle index when deleting current vehicle
+  - Clears chat session when deleting active vehicle
+- **Frontend**: Toast notification system
+  - Bottom-right positioned toast with slide-up animation
+  - Green checkmark icon for success
+  - Shows vehicle name in success message
+  - Auto-dismisses after 3 seconds
+  - CSS keyframe animation for smooth slide-up effect
+- **Infrastructure**: API Gateway DELETE route with JWT authorization
+  - Route: DELETE /vehicles/{vehicleId}
+  - JWT authorization required (Auth0)
+  - Integrated with unified Lambda handler
+
+### Changed - API Client
+
+- **Frontend**: Fixed 204 No Content response handling in `apiClient.request()`
+  - Added check for 204 status code to return `undefined` instead of parsing empty JSON
+  - Prevents JSON parse errors on successful DELETE responses
+  - Maintains backward compatibility with other endpoints
+
+### Security - Vehicle Deletion
+
+- **Authorization**: DELETE endpoint verifies vehicle ownership before deletion
+  - Extracts ownerId from JWT token claims (sub field)
+  - Queries MongoDB with both _id and ownership.ownerId
+  - Returns 404 if vehicle not found or doesn't belong to user
+  - Prevents users from deleting other users' vehicles
+- **Authentication**: JWT token required (enforced at API Gateway level)
+- **Data Integrity**: Cascading delete ensures no orphaned records
+  - Vehicle events deleted via vehicleId foreign key
+  - Conversation sessions deleted via vehicleId foreign key
+  - Conversation messages deleted via sessionId from sessions
+
+### Technical Details - Delete Feature
+
+- **Deletion Strategy**: Parallel deletion with Promise.all for performance
+  - Vehicle document and events deleted simultaneously
+  - Sessions fetched to get IDs for message cleanup
+  - Messages and sessions deleted in sequence after fetch
+- **Error Handling**: Comprehensive error responses
+  - 400 for missing/invalid vehicleId
+  - 401 for missing user identity
+  - 404 for vehicle not found or unauthorized access
+  - 500 for server errors with error logging
+- **UI/UX**: Progressive deletion flow
+  - Click delete → Confirmation modal → Toast on success → UI update
+  - Loading states during deletion prevent duplicate requests
+  - Smooth transitions when vehicle list changes
+- **Lambda Package**: 8.31 MB (includes deleteVehicle handler)
+
+### Benefits - Delete Feature
+
+- **Security**: Ownership validation prevents unauthorized deletions
+- **User Experience**: Confirmation prevents accidental deletions
+- **Data Cleanup**: Cascading delete removes all related data automatically
+- **Feedback**: Toast notifications provide clear success confirmation
+- **Multi-vehicle Support**: Works seamlessly with tabbed vehicle interface
+
 ## [Progressive Data Loading] - 2025-11-28
 
 ### Added - Progressive Enrichment UI

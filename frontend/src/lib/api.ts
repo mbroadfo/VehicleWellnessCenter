@@ -180,6 +180,11 @@ class APIClient {
       throw error;
     }
 
+    // Handle 204 No Content responses (empty body)
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
     return response.json();
   }
 
@@ -210,6 +215,12 @@ class APIClient {
 
   async getSafetyData(vehicleId: string): Promise<SafetyData> {
     return this.request(`/vehicles/${vehicleId}/safety`);
+  }
+
+  async deleteVehicle(vehicleId: string): Promise<void> {
+    await this.request(`/vehicles/${vehicleId}`, {
+      method: 'DELETE',
+    });
   }
 
   async getEvents(vehicleId: string): Promise<{ events: VehicleEvent[] }> {

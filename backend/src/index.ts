@@ -9,6 +9,7 @@ import { getConversationMessagesHandler } from "./routes/getConversationMessages
 import { importDealerDataHandler } from "./routes/importDealerData";
 import { createVehicle } from "./routes/createVehicle";
 import { listVehicles } from "./routes/listVehicles";
+import { deleteVehicle } from "./routes/deleteVehicle";
 
 /**
  * Main Lambda Router
@@ -71,6 +72,10 @@ export const handler = async (
 
     if (method === "POST" && path.match(/^\/vehicles\/[^/]+\/import-dealer-data$/)) {
       return await importDealerDataHandler(event);
+    }
+
+    if (method === "DELETE" && path.match(/^\/vehicles\/[^/]+$/)) {
+      return await deleteVehicle(event);
     }
 
     // 404 - Route not found

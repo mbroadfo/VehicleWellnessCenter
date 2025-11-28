@@ -4,6 +4,7 @@ import { apiClient, type Vehicle } from './lib/api';
 import VehicleReport from './components/VehicleReport';
 import ChatPane from './components/ChatPane';
 import AddVehicleModal from './components/AddVehicleModal';
+import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 
 function App() {
   const { isLoading, isAuthenticated, error: authError, loginWithRedirect, logout, getAccessTokenSilently, user } = useAuth0();
@@ -15,6 +16,10 @@ function App() {
   const [loadingSpecs, setLoadingSpecs] = useState<Record<string, boolean>>({});
   const [loadingSafety, setLoadingSafety] = useState<Record<string, boolean>>({});
   const [loadingFuelEconomy, setLoadingFuelEconomy] = useState<Record<string, boolean>>({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   // Redirect to Auth0 login if not authenticated
   useEffect(() => {
@@ -215,6 +220,58 @@ function App() {
     }
   };
 
+  const handleDeleteVehicle = (vehicle: Vehicle) => {
+    setVehicleToDelete(vehicle);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!vehicleToDelete) return;
+
+    try {
+      setLoading(true);
+      await apiClient.deleteVehicle(vehicleToDelete._id);
+      
+      // Remove from vehicles array
+      const newVehicles = vehicles.filter(v => v._id !== vehicleToDelete._id);
+      setVehicles(newVehicles);
+      
+      // Adjust active vehicle index if needed
+      if (activeVehicleIndex >= newVehicles.length) {
+        setActiveVehicleIndex(Math.max(0, newVehicles.length - 1));
+      }
+      
+      // Clear session if we deleted the active vehicle
+      if (vehicles[activeVehicleIndex]?._id === vehicleToDelete._id) {
+        setSessionId(undefined);
+      }
+      
+      // Show success toast
+      const vehicleName = vehicleToDelete.specs?.make && vehicleToDelete.specs?.model
+        ? `${vehicleToDelete.specs.year || ''} ${vehicleToDelete.specs.make} ${vehicleToDelete.specs.model}`.trim()
+        : 'Vehicle';
+      setToastMessage(`${vehicleName} deleted successfully`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      
+      console.log(`✓ Vehicle deleted: ${vehicleToDelete._id}`);
+    } catch (err) {
+      console.error('Failed to delete vehicle:', err);
+      setToastMessage('Failed to delete vehicle');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setLoading(false);
+      setShowDeleteModal(false);
+      setVehicleToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setVehicleToDelete(null);
+  };
+
   // Show loading screen while Auth0 is initializing
   if (isLoading) {
     return (
@@ -354,6 +411,7 @@ function App() {
                 onRefreshSpecs={handleRefreshSpecs}
                 onRefreshSafety={handleRefreshSafety}
                 onRefreshFuelEconomy={handleRefreshFuelEconomy}
+                onDelete={() => handleDeleteVehicle(activeVehicle)}
                 loadingSpecs={loadingSpecs[activeVehicle._id]}
                 loadingSafety={loadingSafety[activeVehicle._id]}
                 loadingFuelEconomy={loadingFuelEconomy[activeVehicle._id]}
@@ -381,6 +439,30 @@ function App() {
         onClose={() => setShowAddModal(false)}
         onVehicleAdded={handleVehicleAdded}
       />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={showDeleteModal}
+        vehicleName={
+          vehicleToDelete?.specs?.make && vehicleToDelete?.specs?.model
+            ? `${vehicleToDelete.specs.year || ''} ${vehicleToDelete.specs.make} ${vehicleToDelete.specs.model}`.trim()
+            : vehicleToDelete?.vin || 'this vehicle'
+        }
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+          <div className="bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{toastMessage}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ interface VehicleReportProps {
   onRefreshSpecs?: () => Promise<void>;
   onRefreshSafety?: () => Promise<void>;
   onRefreshFuelEconomy?: () => Promise<void>;
+  onDelete?: () => void;
   loadingSpecs?: boolean;
   loadingSafety?: boolean;
   loadingFuelEconomy?: boolean;
@@ -18,6 +19,7 @@ export default function VehicleReport({
   onRefreshSpecs,
   onRefreshSafety,
   onRefreshFuelEconomy,
+  onDelete,
   loadingSpecs = false,
   loadingSafety = false,
   loadingFuelEconomy = false
@@ -74,16 +76,30 @@ export default function VehicleReport({
             <p className="text-sm text-gray-500 mt-1">VIN: {vehicle.vin}</p>
           )}
         </div>
-        <button
-          onClick={onRefresh}
-          className="btn-secondary flex items-center gap-2"
-          title="Refresh all vehicle data"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh All
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onRefresh}
+            className="btn-secondary flex items-center gap-2"
+            title="Refresh all vehicle data"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh All
+          </button>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded font-medium flex items-center gap-2 transition-colors"
+              title="Delete this vehicle"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Vehicle Specifications */}
