@@ -26,17 +26,23 @@ describe('Dealer Portal Import Tests', () => {
     // Delete any existing test vehicles with this VIN or name
     await collection.deleteMany({
       $or: [
-        { vin: TEST_VIN },
+        { 'identification.vin': TEST_VIN },
         { name: TEST_VEHICLE_NAME }
       ]
     });
 
     const result = await collection.insertOne({
-      vin: TEST_VIN,
-      name: TEST_VEHICLE_NAME,
-      year: 2017,
-      make: 'Jeep',
-      model: 'Cherokee',
+      identification: {
+        vin: TEST_VIN,
+      },
+      attributes: {
+        year: 2017,
+        make: 'Jeep',
+        model: 'Cherokee',
+      },
+      ownership: {
+        nickname: TEST_VEHICLE_NAME,
+      },
       createdAt: new Date(),
     });
 

@@ -57,9 +57,9 @@ export async function getVehicleSafetyHandler(
 
     // Extract make, model, year from vehicle (check both nested and flat locations)
     const vehicleAny = vehicle as any;
-    const make = vehicleAny.identification?.make || vehicleAny.specs?.make || vehicleAny.make;
-    const model = vehicleAny.identification?.model || vehicleAny.specs?.model || vehicleAny.model;
-    const year = vehicleAny.identification?.year || vehicleAny.specs?.year || vehicleAny.year;
+    const make = vehicleAny.identification?.make || vehicleAny.specs?.make || vehicleAny.attributes?.make || vehicleAny.make;
+    const model = vehicleAny.identification?.model || vehicleAny.specs?.model || vehicleAny.attributes?.model || vehicleAny.model;
+    const year = vehicleAny.identification?.year || vehicleAny.specs?.year || vehicleAny.attributes?.year || vehicleAny.year;
 
     if (!make || !model || !year) {
       return {

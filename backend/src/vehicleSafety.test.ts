@@ -23,17 +23,23 @@ beforeAll(async () => {
   const vehicles = db.collection('vehicles');
 
   // Delete existing test vehicle by VIN (prevents duplicate key errors on reruns)
-  await vehicles.deleteOne({ vin: TEST_VIN });
+  await vehicles.deleteOne({ 'identification.vin': TEST_VIN });
 
   // Create test vehicle with specific ID
   const result = await vehicles.insertOne({
     _id: TEST_VEHICLE_ID,
-    vin: TEST_VIN,
-    make: 'Jeep',
-    model: 'Cherokee',
-    year: 2017,
-    userId: 'test-user',
-    nickname: 'Test Jeep',
+    identification: {
+      vin: TEST_VIN,
+    },
+    attributes: {
+      make: 'Jeep',
+      model: 'Cherokee',
+      year: 2017,
+    },
+    ownership: {
+      ownerId: 'test-user',
+      nickname: 'Test Jeep',
+    },
     createdAt: new Date(),
   });
 
@@ -276,16 +282,22 @@ describe('GET /vehicles/:id/safety endpoint', () => {
 
     // Ensure test vehicle exists before endpoint call
     await vehicles.updateOne(
-      { vin: TEST_VIN },
+      { 'identification.vin': TEST_VIN },
       {
         $setOnInsert: {
           _id: TEST_VEHICLE_ID,
-          vin: TEST_VIN,
-          make: 'Jeep',
-          model: 'Cherokee',
-          year: 2017,
-          userId: 'test-user',
-          nickname: 'Test Jeep',
+          identification: {
+            vin: TEST_VIN,
+          },
+          attributes: {
+            make: 'Jeep',
+            model: 'Cherokee',
+            year: 2017,
+          },
+          ownership: {
+            ownerId: 'test-user',
+            nickname: 'Test Jeep',
+          },
           createdAt: new Date(),
         },
       },
@@ -310,7 +322,7 @@ describe('GET /vehicles/:id/safety endpoint', () => {
     // Fetch vehicle from DB and check safety field
     let updatedVehicle = await vehicles.findOne({ _id: TEST_VEHICLE_ID });
     if (!updatedVehicle) {
-      updatedVehicle = await vehicles.findOne({ vin: TEST_VIN });
+      updatedVehicle = await vehicles.findOne({ 'identification.vin': TEST_VIN });
     }
     expect(updatedVehicle).toBeDefined();
     expect(updatedVehicle!.safety).toBeDefined();

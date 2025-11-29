@@ -11,6 +11,17 @@ import { isValidVIN, sanitizeVIN, getVINValidationError } from './lib/vinValidat
 // Test VIN - 2017 Jeep Cherokee
 const TEST_VIN = '1C4PJMBS9HW664582';
 
+// Clean up test data before all tests
+beforeAll(async () => {
+  const db = await getDatabase();
+  const vehicles = db.collection('vehicles');
+  
+  // Delete any existing test vehicles with this VIN
+  await vehicles.deleteMany({ 'identification.vin': TEST_VIN });
+  
+  console.log('  🧹 Cleaned up old test data');
+});
+
 describe('VIN Validator', () => {
   it('should validate a correct VIN', () => {
     expect(isValidVIN(TEST_VIN)).toBe(true);

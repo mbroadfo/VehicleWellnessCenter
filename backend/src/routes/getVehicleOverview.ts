@@ -82,19 +82,25 @@ export async function handler(
       .limit(5)
       .toArray();
 
-    // Return full vehicle document for frontend
-    const response = {
-      _id: vehicle._id.toString(),
+    // Return overview with vehicle data and recent events
+    const response: VehicleOverview = {
+      vehicleId: vehicle._id.toString(),
       vin: (vehicle as any).identification?.vin || (vehicle as any).vin,
-      year: (vehicle as any).identification?.year,
-      make: (vehicle as any).identification?.make,
-      model: (vehicle as any).identification?.model,
-      specs: (vehicle as any).specs,
-      safety: (vehicle as any).safety,
-      fuelEconomy: (vehicle as any).fuelEconomy,
-      dealerPortal: (vehicle as any).dealerPortal,
-      createdAt: vehicle.createdAt,
-      lastUpdated: vehicle.updatedAt,
+      year: (vehicle as any).attributes?.year || (vehicle as any).identification?.year,
+      make: (vehicle as any).attributes?.make || (vehicle as any).identification?.make,
+      model: (vehicle as any).attributes?.model || (vehicle as any).identification?.model,
+      odometer: (vehicle as any).odometer?.current,
+      acquisitionDate: (vehicle as any).acquisition?.date,
+      estimatedValue: (vehicle as any).valuation?.estimatedValue || (vehicle as any).valuation?.estimated,
+      eventCount,
+      recentEvents: recentEvents.map((event: any) => ({
+        _id: event._id.toString(),
+        type: event.type,
+        emoji: event.emoji,
+        occurredAt: event.occurredAt,
+        summary: event.summary,
+      })),
+      upcomingMaintenance: [], // TODO: Calculate from maintenance schedule
     };
 
     return {

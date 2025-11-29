@@ -4,6 +4,36 @@ All notable changes to the Vehicle Wellness Center project will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Test Suite MongoDB Schema Fix] - 2025-11-28
+
+### Fixed - Test Reliability
+
+- **Backend Tests**: Fixed MongoDB schema mismatch causing 18 test failures
+  - **Root Cause**: Tests were creating vehicles with flat `vin` field, but production schema uses nested `identification.vin`
+  - **Impact**: E11000 duplicate key errors on `uk_vehicle_identification_vin` unique index
+  - **Files Updated**:
+    - `backend/src/api-integration.test.ts`: Fixed vehicle creation schema + added pre-test cleanup
+    - `backend/src/enrichVehicle.test.ts`: Added pre-test cleanup hook
+    - `backend/src/importDealerData.test.ts`: Fixed vehicle schema in beforeAll
+    - `backend/src/vehicleSafety.test.ts`: Fixed schema in beforeAll and persistence test
+  - **Result**: All 100 tests now passing (was 82/100)
+
+- **Backend Handlers**: Enhanced field extraction for test compatibility
+  - `backend/src/routes/getVehicleOverview.ts`:
+    - Fixed to return `vehicleId` instead of `_id`
+    - Added `eventCount` and `recentEvents` to response
+    - Added `attributes` fallback for make/model/year extraction
+  - `backend/src/routes/getVehicleSafety.ts`:
+    - Added `attributes` fallback when extracting make/model/year
+    - Prevents 400 errors when vehicle data is in `attributes` vs `identification`
+
+### Changed - Test Architecture
+
+- **Pre-Test Cleanup Pattern**: All test suites now delete old test data in `beforeAll` hooks
+  - Prevents duplicate key errors on test reruns
+  - Uses `identification.vin` path with regex matching for TEST vehicles
+  - Ensures test isolation and repeatability
+
 ## [Vehicle Delete Feature] - 2025-11-28
 
 ### Added - Vehicle Deletion

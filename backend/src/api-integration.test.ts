@@ -103,7 +103,9 @@ describe('API Integration Test Suite', () => {
       
       const vehicle = {
         _id: vehicleOid,
-        vin: `TEST${Date.now()}`,
+        identification: {
+          vin: `TEST${Date.now()}`,
+        },
         attributes: {
           make: 'Tesla',
           model: 'Model 3',
