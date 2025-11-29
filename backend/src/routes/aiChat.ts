@@ -145,6 +145,16 @@ is the active vehicle the user is asking about. USE THAT VEHICLE ID for all func
 unless the user explicitly mentions a different vehicle. Do NOT ask for the vehicle ID if 
 it's provided in the context.
 
+IMPORTANT: For new conversations, full vehicle context is PRE-LOADED automatically including:
+- Vehicle details (year, make, model, VIN)
+- Specifications (engine, transmission, body type)
+- Safety data (recalls, complaints, NCAP ratings)
+- Fuel economy (EPA city/highway/combined MPG)
+
+You can answer questions about specs, safety, and fuel economy WITHOUT calling getVehicleOverview 
+again if the context is already provided. Only call getVehicleOverview if you need updated data 
+or if context wasn't provided.
+
 AVAILABLE TOOLS:
 1. getVehicleOverview(vehicleId) - Get ALL vehicle data including specs, safety, fuel economy, and details. Use this for most queries!
 2. listVehicleEvents(vehicleId, eventType?, limit?) - List vehicle maintenance history
@@ -482,10 +492,10 @@ export const handler = async (
     }
 
     // Initialize Gemini
-    // Using gemini-2.0-flash-exp (experimental but has separate quota from 2.5-flash)
+    // Using gemini-2.0-flash (stable model with better free-tier quotas)
     const genAI = new GoogleGenerativeAI(googleApiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.0-flash",
       systemInstruction: SYSTEM_INSTRUCTION,
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS as any }]
     });
@@ -503,8 +513,40 @@ export const handler = async (
 
     // Build context with vehicleId if provided
     let userMessage = request.message;
+    let vehicleContext = '';
+    
+    // If this is a new session with a vehicleId, automatically load vehicle data
+    if (request.vehicleId && isNewSession) {
+      try {
+        console.log(`Auto-loading vehicle context for ${request.vehicleId}`);
+        const vehicleData = await executeFunctionCall(
+          'getVehicleOverview',
+          { vehicleId: request.vehicleId },
+          apiUrl,
+          authToken
+        );
+        
+        // Build rich context from vehicle data
+        const v = vehicleData as any;
+        vehicleContext = `[Vehicle Context]
+- ID: ${v._id}
+- VIN: ${v.vin || 'N/A'}
+- Vehicle: ${v.year || ''} ${v.make || ''} ${v.model || ''}
+- Specs: ${v.specs ? `${v.specs.engine?.cylinders}cyl ${v.specs.engine?.displacement}L ${v.specs.engine?.fuelType || ''}` : 'Not available'}
+- Safety: ${v.safety ? `${v.safety.recalls?.length || 0} recalls, ${v.safety.complaints?.length || 0} complaints, ${v.safety.ncapRating?.overall || 'N/A'}-star rating` : 'Not available'}
+- Fuel Economy: ${v.fuelEconomy?.epa ? `${v.fuelEconomy.epa.city}/${v.fuelEconomy.epa.highway}/${v.fuelEconomy.epa.combined} MPG` : 'Not available'}
+
+`;
+        
+        console.log(`Loaded vehicle context: ${v.year} ${v.make} ${v.model}`);
+      } catch (error) {
+        console.error('Failed to load vehicle context:', error);
+        // Continue without context - AI can still call getVehicleOverview if needed
+      }
+    }
+    
     if (request.vehicleId) {
-      userMessage = `[Context: User is viewing vehicle ${request.vehicleId}]\n\n${request.message}`;
+      userMessage = `[Context: User is viewing vehicle ${request.vehicleId}]\n${vehicleContext}\n${request.message}`;
     }
 
     // Send message and handle function calls
