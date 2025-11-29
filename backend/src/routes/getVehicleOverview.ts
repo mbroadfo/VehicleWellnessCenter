@@ -2,33 +2,12 @@ import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { ObjectId } from "mongodb";
 import { getDatabase } from "../lib/mongodb";
 
-interface VehicleOverview {
-  vehicleId: string;
-  vin: string;
-  make?: string;
-  model?: string;
-  year?: number;
-  odometer?: number;
-  acquisitionDate?: string;
-  estimatedValue?: number;
-  eventCount: number;
-  recentEvents: Array<{
-    _id: string;
-    type: string;
-    emoji?: string;
-    occurredAt: string;
-    summary: string;
-  }>;
-  upcomingMaintenance?: Array<{
-    type: string;
-    dueDate?: string;
-    dueMileage?: number;
-  }>;
-}
-
 /**
  * Lambda handler for getVehicleOverview
  * GET /vehicles/{vehicleId}/overview
+ * 
+ * Returns the full vehicle document with all nested data (specs, safety, fuelEconomy, etc.)
+ * This matches the frontend Vehicle interface structure.
  */
 export async function handler(
   event: APIGatewayProxyEventV2
@@ -55,7 +34,6 @@ export async function handler(
 
     const db = await getDatabase();
     const vehiclesCollection = db.collection("vehicles");
-    const eventsCollection = db.collection("vehicleEvents");
 
     // Fetch vehicle details
     const vehicle = await vehiclesCollection.findOne({
@@ -70,37 +48,22 @@ export async function handler(
       };
     }
 
-    // Count total events
-    const eventCount = await eventsCollection.countDocuments({
-      vehicleId: new ObjectId(vehicleId),
-    });
-
-    // Fetch recent events (last 5)
-    const recentEvents = await eventsCollection
-      .find({ vehicleId: new ObjectId(vehicleId) })
-      .sort({ occurredAt: -1 })
-      .limit(5)
-      .toArray();
-
-    // Return overview with vehicle data and recent events
-    const response: VehicleOverview = {
-      vehicleId: vehicle._id.toString(),
+    // Transform MongoDB document to frontend Vehicle interface
+    // Convert ObjectId to string and preserve all nested data
+    const response = {
+      _id: vehicle._id.toString(),
       vin: (vehicle as any).identification?.vin || (vehicle as any).vin,
-      year: (vehicle as any).attributes?.year || (vehicle as any).identification?.year,
-      make: (vehicle as any).attributes?.make || (vehicle as any).identification?.make,
-      model: (vehicle as any).attributes?.model || (vehicle as any).identification?.model,
-      odometer: (vehicle as any).odometer?.current,
-      acquisitionDate: (vehicle as any).acquisition?.date,
-      estimatedValue: (vehicle as any).valuation?.estimatedValue || (vehicle as any).valuation?.estimated,
-      eventCount,
-      recentEvents: recentEvents.map((event: any) => ({
-        _id: event._id.toString(),
-        type: event.type,
-        emoji: event.emoji,
-        occurredAt: event.occurredAt,
-        summary: event.summary,
-      })),
-      upcomingMaintenance: [], // TODO: Calculate from maintenance schedule
+      name: (vehicle as any).ownership?.nickname,
+      // Check multiple sources for make/model/year: attributes, identification, specs
+      year: (vehicle as any).attributes?.year || (vehicle as any).identification?.year || (vehicle as any).specs?.year,
+      make: (vehicle as any).attributes?.make || (vehicle as any).identification?.make || (vehicle as any).specs?.make,
+      model: (vehicle as any).attributes?.model || (vehicle as any).identification?.model || (vehicle as any).specs?.model,
+      specs: (vehicle as any).specs,
+      safety: (vehicle as any).safety,
+      fuelEconomy: (vehicle as any).fuelEconomy,
+      dealerPortal: (vehicle as any).dealerPortal,
+      createdAt: (vehicle as any).createdAt,
+      lastUpdated: (vehicle as any).lastUpdated,
     };
 
     return {

@@ -56,49 +56,52 @@ describe("getVehicleOverview", () => {
     expect(JSON.parse((result as any).body)).toEqual({ error: "Vehicle not found" });
   });
 
-  it("returns vehicle overview successfully", async () => {
+  it("returns full vehicle document successfully", async () => {
     const mockVehicle = {
       _id: "507f1f77bcf86cd799439011",
-      vin: "1HGBH41JXMN109186",
-      attributes: {
+      identification: {
+        vin: "1HGBH41JXMN109186",
         make: "Honda",
         model: "Accord",
         year: 2021,
       },
-      odometer: { current: 45000 },
-      acquisition: { date: "2021-03-15" },
-      valuation: { estimatedValue: 25000 },
-    };
-
-    const mockEvents = [
-      {
-        _id: "507f1f77bcf86cd799439012",
-        type: "oil_change",
-        emoji: "🛢️",
-        occurredAt: "2024-01-15",
-        summary: "Regular oil change",
+      ownership: {
+        nickname: "My Honda",
       },
-    ];
+      specs: {
+        make: "Honda",
+        model: "Accord",
+        year: 2021,
+        engine: {
+          cylinders: 4,
+          displacement: 1.5,
+        },
+        decodedAt: "2024-01-01T00:00:00Z",
+      },
+      safety: {
+        recalls: [],
+        complaints: [],
+        lastChecked: "2024-01-15T00:00:00Z",
+      },
+      fuelEconomy: {
+        epa: {
+          city: 30,
+          highway: 38,
+          combined: 33,
+        },
+        lastUpdated: "2024-01-01T00:00:00Z",
+      },
+      createdAt: "2024-01-01T00:00:00Z",
+      lastUpdated: "2024-01-15T00:00:00Z",
+    };
 
     const mockVehiclesCollection = {
       findOne: vi.fn().mockResolvedValue(mockVehicle),
     };
 
-    const mockEventsCollection = {
-      countDocuments: vi.fn().mockResolvedValue(5),
-      find: vi.fn().mockReturnValue({
-        sort: vi.fn().mockReturnValue({
-          limit: vi.fn().mockReturnValue({
-            toArray: vi.fn().mockResolvedValue(mockEvents),
-          }),
-        }),
-      }),
-    };
-
     const mockDb = {
       collection: vi.fn((name: string) => {
         if (name === "vehicles") return mockVehiclesCollection;
-        if (name === "vehicleEvents") return mockEventsCollection;
         return {};
       }),
     };
@@ -114,25 +117,38 @@ describe("getVehicleOverview", () => {
     expect((result as any).statusCode).toBe(200);
     const body = JSON.parse((result as any).body);
     expect(body).toEqual({
-      vehicleId: "507f1f77bcf86cd799439011",
+      _id: "507f1f77bcf86cd799439011",
       vin: "1HGBH41JXMN109186",
+      name: "My Honda",
       make: "Honda",
       model: "Accord",
       year: 2021,
-      odometer: 45000,
-      acquisitionDate: "2021-03-15",
-      estimatedValue: 25000,
-      eventCount: 5,
-      recentEvents: [
-        {
-          _id: "507f1f77bcf86cd799439012",
-          type: "oil_change",
-          emoji: "🛢️",
-          occurredAt: "2024-01-15",
-          summary: "Regular oil change",
+      specs: {
+        make: "Honda",
+        model: "Accord",
+        year: 2021,
+        engine: {
+          cylinders: 4,
+          displacement: 1.5,
         },
-      ],
-      upcomingMaintenance: [],
+        decodedAt: "2024-01-01T00:00:00Z",
+      },
+      safety: {
+        recalls: [],
+        complaints: [],
+        lastChecked: "2024-01-15T00:00:00Z",
+      },
+      fuelEconomy: {
+        epa: {
+          city: 30,
+          highway: 38,
+          combined: 33,
+        },
+        lastUpdated: "2024-01-01T00:00:00Z",
+      },
+      dealerPortal: undefined,
+      createdAt: "2024-01-01T00:00:00Z",
+      lastUpdated: "2024-01-15T00:00:00Z",
     });
   });
 });
