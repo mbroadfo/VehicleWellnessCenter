@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:integration": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 vitest run api-integration.test.ts",
     "test:connection": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node tests/test-connection.ts",
+    "test:honda-import": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node tests/test-honda-import.ts",
     "init:collections": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/init-collections.ts",
     "migrate:vehicle-schema": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/migrate-vehicle-schema.ts",
     "seed:test": "cross-env AWS_PROFILE=terraform-vwc AWS_REGION=us-west-2 ts-node src/seed-test-data.ts"

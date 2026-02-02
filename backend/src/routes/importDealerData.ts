@@ -6,6 +6,7 @@
  * 
  * Supported Sources:
  * - Mopar (Jeep, Chrysler, Dodge, Ram, Fiat, Alfa Romeo)
+ * - Honda (Honda, Acura)
  * - GM (Chevrolet, GMC, Buick, Cadillac) - Future
  * - Ford/Lincoln - Future
  * - Toyota/Lexus - Future
@@ -25,7 +26,7 @@ import { getSecretsFromParameterStore } from '../lib/parameterStore.js';
 import type { DealerPortalData } from '../lib/externalApis.js';
 
 interface ImportRequest {
-  source: 'mopar' | 'gm' | 'ford' | 'toyota';
+  source: 'mopar' | 'honda' | 'gm' | 'ford' | 'toyota';
   dataType: 'dashboard' | 'recalls' | 'service_history' | 'warranty';
   content: string; // HTML or base64 screenshot
 }
@@ -151,26 +152,99 @@ async function parseMoparServiceHistory(html: string): Promise<any[]> {
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const prompt = `
-You are parsing HTML from a Mopar maintenance records page. Extract service records from the table.
+You are parsing maintenance records from a dealer portal (Mopar or Honda). Extract service records from the content.
 
 Each record should have:
-- Date (parse as ISO date string)
-- Description (service performed)
+- Date (parse as ISO date string, e.g., "11/07/2025" → "2025-11-07T00:00:00Z")
+- Description (main service description)
 - Provider (dealer/shop name)
-- Odometer (mileage at time of service)
+- Odometer/Mileage (mileage at time of service)
+- Repair Order Number (if present, e.g., "RO#: 931589" or "Repair Order #: 931589")
+- Services (array of service items performed)
+- Parts (array of parts used with part numbers if available)
+
+Parse detailed information when available:
+- For Honda: Look for Job/Service/Part Names/Part Numbers tables
+- For Mopar: Extract comma-separated service descriptions
 
 Return JSON array:
 [
   {
     "date": "ISO date string",
-    "description": "service description",
+    "description": "primary service description",
     "provider": "provider name",
-    "mileage": number
+    "mileage": number,
+    "repairOrderNumber": "RO number if present",
+    "services": ["service 1", "service 2", ...],
+    "parts": [
+      { "name": "part name", "partNumber": "part number" }
+    ]
   }
 ]
 
+If parts information is not available, return empty parts array.
+If services are just in description, parse them into the services array.
+
+Content to parse:
+${html.substring(0, 16000)}
+`;
+
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+    },
+  });
+
+  const response = result.response.text();
+  const records = JSON.parse(response);
+
+  return Array.isArray(records) ? records : [];
+}
+
+/**
+ * Parse Honda service history HTML using Gemini
+ */
+async function parseHondaServiceHistory(html: string): Promise<any[]> {
+  const secrets = await getSecretsFromParameterStore();
+  const apiKey = secrets.GOOGLE_API_KEY;
+  if (!apiKey) {
+    throw new Error('GOOGLE_API_KEY not configured');
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+  const prompt = `
+You are parsing HTML from a Honda Owner Link service records page. Extract service records from the content.
+
+Look for records with:
+- Date of Service (e.g., "11/07/2025")
+- Mileage (e.g., "62,117")
+- Services (comma-separated list like "PREPAID LOF PURCHASE, PREPAID OIL CHANGE 1, MULTI POINT INSPECT")
+- Repair Order # (e.g., "931589")
+- Parts breakdown (if available from detail view with Job/Service/Part Names/Part Numbers)
+
+Return JSON array:
+[
+  {
+    "date": "ISO date string (e.g., 2025-11-07T00:00:00Z)",
+    "mileage": number,
+    "description": "primary service description",
+    "services": ["service 1", "service 2", ...],
+    "repairOrderNumber": "RO number",
+    "parts": [
+      { "name": "part name", "partNumber": "part number" }
+    ]
+  }
+]
+
+Parse service descriptions into individual service items in the services array.
+Extract part numbers when available (look for patterns like "15400-PLM-A02").
+
 HTML Content:
-${html.substring(0, 8000)}
+${html.substring(0, 16000)}
 `;
 
   const result = await model.generateContent({
@@ -280,7 +354,7 @@ export async function importDealerDataHandler(
         console.log('[Import] Parsing Mopar service history...');
         const serviceRecords = await parseMoparServiceHistory(content);
 
-        // Add service records as events
+        // Add service records as events with enhanced details
         const eventsCollection = db.collection('events');
         const eventDocs = serviceRecords.map((record) => ({
           vehicleId: new ObjectId(vehicleId),
@@ -291,6 +365,11 @@ export async function importDealerDataHandler(
           description: record.description,
           provider: record.provider,
           source: 'mopar_import',
+          repairOrderNumber: record.repairOrderNumber,
+          details: {
+            services: record.services || [],
+            parts: record.parts || [],
+          },
           importedAt: new Date(),
         }));
 
@@ -300,6 +379,42 @@ export async function importDealerDataHandler(
         }
 
         console.log(`[Import] Imported ${eventDocs.length} service records`);
+      }
+    } else if (source === 'honda') {
+      if (dataType === 'service_history') {
+        console.log('[Import] Parsing Honda service history...');
+        const serviceRecords = await parseHondaServiceHistory(content);
+
+        // Add service records as events with detailed parts information
+        const eventsCollection = db.collection('events');
+        const eventDocs = serviceRecords.map((record) => ({
+          vehicleId: new ObjectId(vehicleId),
+          type: 'service',
+          category: 'maintenance',
+          date: new Date(record.date),
+          mileage: record.mileage,
+          description: record.description || record.services?.join(', ') || 'Service performed',
+          provider: 'Honda Dealer', // Can be enhanced if provider info is in HTML
+          source: 'honda_import',
+          repairOrderNumber: record.repairOrderNumber,
+          details: {
+            services: record.services || [],
+            parts: record.parts || [],
+          },
+          importedAt: new Date(),
+        }));
+
+        if (eventDocs.length > 0) {
+          await eventsCollection.insertMany(eventDocs);
+          importedData.serviceRecords = eventDocs.length;
+        }
+
+        console.log(`[Import] Imported ${eventDocs.length} Honda service records`);
+      } else {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: `Honda ${dataType} import not yet supported. Only service_history is currently available.` }),
+        };
       }
     } else {
       return {

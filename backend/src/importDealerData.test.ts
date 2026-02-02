@@ -176,6 +176,67 @@ describe('Dealer Portal Import Tests', () => {
   // ============================================================================
 
   it(
+    'should import Honda service history',
+    async () => {
+      const event = createMockEvent('POST', `/vehicles/${TEST_VEHICLE_ID}/import-dealer-data`, {
+        vehicleId: TEST_VEHICLE_ID,
+      });
+      event.body = JSON.stringify({
+        source: 'honda',
+        dataType: 'service_history',
+        content: `
+Date of Service: 11/07/2025
+Mileage: 62,117
+Services: PREPAID LOF PURCHASE, PREPAID OIL CHANGE 1, MULTI POINT INSPECT, COMPLIMENTARY WASH, 2 PERCENT FEE, LOANER, TIRE ROTATION, REAR DIFF SVC, BRAKE FLUID, ALIGNMENT 4 WHEEL
+Repair Order #: 931589
+
+Parts:
+Job 02: PREPAID OIL CHANGE 1
+- FILTER, ENGINE OIL (15400-PLM-A02)
+- WASHER (94109-14000)
+
+Job 10: REAR DIFF SVC
+- OIL,ATF (08200-9007)
+- WASHER (94109-20000)
+- WASHER (90471-PX4-000)
+
+Job 11: BRAKE FLUID
+- BRAKE FLUID (08798-9108)
+        `,
+      });
+
+      const response = await importDealerDataHandler(event);
+
+      console.log('[Test] Honda response status:', response.statusCode);
+      console.log('[Test] Honda response body:', response.body);
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.importedData?.serviceRecords).toBeGreaterThan(0);
+
+      // Verify events were created
+      const db = await getDatabase();
+      const eventsCollection = db.collection('events');
+      const events = await eventsCollection
+        .find({ vehicleId: new ObjectId(TEST_VEHICLE_ID), source: 'honda_import' })
+        .toArray();
+
+      console.log('[Test] Honda events created:', events.length);
+      expect(events.length).toBeGreaterThan(0);
+
+      // Check that event has detailed parts information
+      const eventWithParts = events.find((e) => e.details?.parts?.length > 0);
+      if (eventWithParts) {
+        console.log('[Test] Event with parts:', eventWithParts.details.parts);
+        expect(eventWithParts.details.parts).toBeDefined();
+        expect(Array.isArray(eventWithParts.details.parts)).toBe(true);
+      }
+    },
+    60000 // 60 second timeout for Gemini API
+  );
+
+  it(
     'should import real Mopar dashboard data',
     async () => {
       const event = createMockEvent('POST', `/vehicles/${TEST_VEHICLE_ID}/import-dealer-data`, {

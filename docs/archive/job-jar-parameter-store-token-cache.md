@@ -41,6 +41,7 @@ Implement AWS Systems Manager Parameter Store for shared Auth0 bearer token cach
 Add SSM parameter resource:
 
 ```hcl
+
 # Auth0 token cache in Parameter Store
 resource "aws_ssm_parameter" "auth0_token_cache" {
   name        = "/vwc/${var.environment}/auth0-token-cache"
@@ -74,6 +75,7 @@ resource "aws_ssm_parameter" "auth0_token_cache" {
 Add to Lambda execution role policy:
 
 ```hcl
+
 # Add to existing Lambda role policy
 statement {
   sid    = "ParameterStoreAccess"
@@ -124,6 +126,7 @@ Add SSM permissions for Terraform user:
 **Manual step required:**
 
 ```powershell
+
 # Update AWS IAM policy
 aws iam put-user-policy `
   --user-name terraform-vwc `
@@ -407,6 +410,7 @@ describe('Auth0 Token Caching', () => {
 Verify Parameter Store integration:
 
 ```powershell
+
 # Deploy infrastructure
 npm run infra:apply
 

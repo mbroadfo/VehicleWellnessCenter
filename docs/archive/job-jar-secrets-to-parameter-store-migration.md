@@ -52,6 +52,7 @@
 #### 1.2 Create Terraform Configuration
 
 ```hcl
+
 # infra/main.tf - Add after auth0_token_cache resource
 
 resource "aws_ssm_parameter" "application_secrets" {
@@ -86,6 +87,7 @@ resource "aws_ssm_parameter" "application_secrets" {
 #### 1.3 Update Lambda IAM Role
 
 ```hcl
+
 # infra/main.tf - Update vwc_lambda_secrets policy
 
 resource "aws_iam_role_policy" "vwc_lambda_secrets" {
@@ -145,6 +147,7 @@ resource "aws_iam_role_policy" "vwc_lambda_secrets" {
 #### 1.5 Add Lambda Environment Variable
 
 ```hcl
+
 # infra/main.tf - Lambda environment block
 
 environment {
@@ -305,6 +308,7 @@ export async function getSecrets(): Promise<AppSecrets> {
 #### 3.1 Export Secrets from Secrets Manager
 
 ```powershell
+
 # Get current secrets as JSON
 
 aws secretsmanager get-secret-value `
@@ -322,6 +326,7 @@ Get-Content temp-secrets.json
 #### 3.2 Import to Parameter Store
 
 ```powershell
+
 # Put secrets into Parameter Store (SecureString = encrypted)
 
 aws ssm put-parameter `
@@ -344,6 +349,7 @@ aws ssm get-parameter `
 #### 3.3 Secure Cleanup
 
 ```powershell
+
 # Delete temporary file securely
 
 Remove-Item temp-secrets.json -Force
@@ -360,6 +366,7 @@ Remove-Item temp-secrets.json -Force
 #### 4.1 Update Lambda Environment Variable
 
 ```bash
+
 # Temporarily enable Parameter Store (Terraform already has SSM_SECRETS_PARAMETER_NAME set)
 
 npm run infra:apply  # Apply Terraform with environment variable
@@ -368,6 +375,7 @@ npm run infra:apply  # Apply Terraform with environment variable
 #### 4.2 Run Full Test Suite
 
 ```bash
+
 # All tests should pass using Parameter Store secrets
 
 npm run test
@@ -426,6 +434,7 @@ console.timeEnd('Secrets load time');
 #### 5.2 Create New Migration Guide
 
 ```markdown
+
 # docs/parameter-store-setup.md
 
 ## Manual Parameter Store Setup
@@ -466,6 +475,7 @@ console.timeEnd('Secrets load time');
 ### Updating Secrets
 
 ```powershell
+
 # Get current value
 
 aws ssm get-parameter --name /vwc/dev/secrets --with-decryption --query Parameter.Value --output text > temp.json
@@ -496,6 +506,7 @@ Remove-Item temp.json -Force
 #### 6.1 Update Terraform to Remove Secrets Manager
 
 ```hcl
+
 # infra/main.tf - REMOVE these blocks:
 
 # DELETE this data source
@@ -517,6 +528,7 @@ Remove-Item temp.json -Force
 #### 6.2 Update Lambda IAM Policy
 
 ```hcl
+
 # infra/main.tf - Remove Secrets Manager permissions
 
 resource "aws_iam_role_policy" "vwc_lambda_secrets" {
@@ -548,6 +560,7 @@ resource "aws_iam_role_policy" "vwc_lambda_secrets" {
 #### 6.3 Update Lambda Environment
 
 ```hcl
+
 # infra/main.tf - Remove AWS_SECRET_ID
 
 environment {
@@ -565,6 +578,7 @@ environment {
 #### 6.4 Update terraform.tfvars.example
 
 ```hcl
+
 # infra/terraform.tfvars.example
 
 # REMOVE this line:
@@ -663,6 +677,7 @@ aws secretsmanager restore-secret `
 #### 8.2 Remove Dead Files
 
 ```bash
+
 # Files to delete:
 
 rm docs/atlas-secrets-todo.md  # Replaced by parameter-store-setup.md
@@ -673,6 +688,7 @@ rm infra/secret-example.json   # Replaced by parameter-example.json
 #### 8.3 Search and Replace
 
 ```bash
+
 # Find any remaining "Secrets Manager" references
 
 grep -r "Secrets Manager" . --include="*.md" --include="*.ts" --include="*.js"
@@ -719,6 +735,7 @@ git commit -m "feat(backend): implement dual-read secrets (Parameter Store with 
 ### Commit 3: Enable Parameter Store
 
 ```bash
+
 # After manual population and testing
 
 git add CHANGELOG.md

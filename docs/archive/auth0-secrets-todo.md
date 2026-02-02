@@ -11,6 +11,7 @@ You need to add two Auth0 fields to your AWS Secrets Manager secret: `vehical-we
 2. **Update AWS Secret**
 
 ```powershell
+
 # Get current secret
 aws secretsmanager get-secret-value `
   --secret-id vehical-wellness-center-dev `

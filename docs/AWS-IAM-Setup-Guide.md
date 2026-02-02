@@ -93,6 +93,7 @@ This is managed by Terraform and attached to the Lambda execution role. You don'
 **Verify After Terraform Apply**:
 
 ```bash
+
 # Check that Terraform created the role
 aws iam get-role --role-name vwc-lambda-execution-role --profile terraform-vwc
 ```
@@ -136,6 +137,7 @@ Copy-Item -Path ".aws-credentials.example" -Destination ".aws-credentials"
 Fill in the values you just created:
 
 ```bash
+
 # VWC API User (for Lambda runtime)
 VWC_API_ACCESS_KEY_ID=AKIA...         # From vwc-api user
 VWC_API_SECRET_ACCESS_KEY=...         # From vwc-api user
@@ -172,6 +174,7 @@ region = us-west-2
 ### 4.4 Test Credentials
 
 ```powershell
+
 # Test Terraform user
 aws sts get-caller-identity --profile terraform-vwc
 
@@ -278,6 +281,7 @@ All application secrets go into a single SecureString parameter.
 **Create the parameter**:
 
 ```powershell
+
 # Create JSON with all secrets
 $secrets = @{
     MONGODB_ATLAS_HOST = "vehicalwellnesscenter-c.shpig7c.mongodb.net"
@@ -308,6 +312,7 @@ aws ssm put-parameter `
 **Verify**:
 
 ```powershell
+
 # Read back (decrypted)
 aws ssm get-parameter `
   --name /vwc/dev/secrets `
@@ -321,6 +326,7 @@ aws ssm get-parameter `
 ### 8.2 Verify Terraform Can Access Secrets
 
 ```powershell
+
 # Load environment and test
 node infra/load-tf-env.js
 
@@ -364,6 +370,7 @@ This creates:
 ### 9.4 Verify Deployment
 
 ```powershell
+
 # Run tests
 npm test
 

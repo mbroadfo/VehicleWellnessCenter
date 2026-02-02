@@ -613,6 +613,7 @@ backend/tests/
 **Example request:**
 
 ```bash
+
 # Step 1: Get vehicle ID by year/make/model
 curl "https://www.fueleconomy.gov/ws/rest/vehicle/menu/options?year=2017&make=Jeep&model=Cherokee"
 

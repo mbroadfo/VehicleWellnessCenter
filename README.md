@@ -113,6 +113,7 @@ npm run clean:all          # Clean all node_modules
 
 - **`PLAN.md`** – Implementation roadmap with milestones
 - **`docs/data-model.md`** – MongoDB schema and collection design
+- **`docs/dealer-import-guide.md`** – Importing dealer maintenance records (Mopar, Honda)
 - **`docs/MongoDB-Atlas-Setup-Guide.md`** – Atlas project and cluster setup
 - **`docs/parameter-store-setup.md`** – Parameter Store secrets provisioning
 - **`backend/README.md`** – Backend Lambda function details

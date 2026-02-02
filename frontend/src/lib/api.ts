@@ -139,6 +139,35 @@ export interface ChatResponse {
   };
 }
 
+export interface MaintenanceService {
+  name: string;
+  cost?: number;
+  notes?: string;
+}
+
+export interface MaintenancePart {
+  name: string;
+  quantity?: number;
+  notes?: string;
+}
+
+export interface ParsedMaintenanceRecord {
+  vendor: string;
+  date: string;
+  odometer: number;
+  services: MaintenanceService[];
+  total: number;
+  parts?: MaintenancePart[];
+  notes?: string;
+}
+
+export interface ParseMaintenanceResponse {
+  success: boolean;
+  parsed?: ParsedMaintenanceRecord;
+  error?: string;
+  message?: string;
+}
+
 class APIClient {
   private baseURL: string;
   private token: string | null = null;
@@ -243,6 +272,14 @@ class APIClient {
         sessionId,
         vehicleId,
       }),
+    });
+  }
+
+  // Maintenance parsing endpoint
+  async parseMaintenance(vehicleId: string, text: string): Promise<ParseMaintenanceResponse> {
+    return this.request(`/vehicles/${vehicleId}/events/parse-maintenance`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
     });
   }
 }

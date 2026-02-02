@@ -101,6 +101,7 @@ Record the actual Organization ID (e.g., `5d5c09149ccf64c5d84a9f0d`).
 3. **Cluster Configuration**:
 
 ```yaml
+
 # Vehicle Wellness Center defaults
 Cluster Type: M0 (Free Tier)
 Cloud Provider: AWS
@@ -221,6 +222,7 @@ async function getMongoUri() {
 ### 5.1 Provider Configuration
 
 ```hcl
+
 # infra/main.tf excerpt
 terraform {
   required_providers {
@@ -240,6 +242,7 @@ provider "mongodbatlas" {
 ### 5.2 Variables
 
 ```hcl
+
 # infra/main.tf variables excerpt
 variable "mongodb_atlas_public_key" {
   description = "MongoDB Atlas API public key"
@@ -266,6 +269,7 @@ variable "mongodb_database_user_secret_id" {
 ### 5.3 Project Resource
 
 ```hcl
+
 # infra/main.tf resources excerpt
 resource "mongodbatlas_serverless_instance" "vehicle" {
   project_id                              = var.mongodb_atlas_project_id
@@ -301,6 +305,7 @@ resource "mongodbatlas_serverless_instance" "vehicle" {
 Keep these secure and accessible:
 
 ```yaml
+
 # Organization Information
 Organization ID: 5d5c09149ccf64c5d84a9f0d (update if different)
 Organization Name: Vehicle Wellness Programs (example)

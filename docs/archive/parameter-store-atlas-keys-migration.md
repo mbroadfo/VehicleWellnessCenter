@@ -33,6 +33,7 @@ The `infra/load-tf-env.js` script currently reads these additional values from t
 ### 1. Export Current Values from Old Secret
 
 ```powershell
+
 # Get the old secret values
 aws secretsmanager get-secret-value `
   --secret-id vehical-wellness-center-dev `
@@ -52,6 +53,7 @@ Copy the values for:
 ### 2. Get Current Parameter Store Value
 
 ```powershell
+
 # Get current parameter
 aws ssm get-parameter `
   --name /vwc/dev/secrets `
@@ -86,6 +88,7 @@ Create a complete JSON with all values:
 Update the parameter:
 
 ```powershell
+
 # Update parameter with merged values
 aws ssm put-parameter `
   --name /vwc/dev/secrets `
@@ -99,6 +102,7 @@ aws ssm put-parameter `
 ### 4. Test Terraform Script
 
 ```powershell
+
 # Test that load-tf-env.js can read all values
 node infra/load-tf-env.js
 ```
@@ -119,6 +123,7 @@ MongoDB Atlas Project ID: ...
 ### 5. Test Terraform Plan
 
 ```powershell
+
 # Verify Terraform can still access Atlas
 npm run infra:plan
 ```

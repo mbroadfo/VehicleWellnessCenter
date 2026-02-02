@@ -86,6 +86,7 @@ Go to **User Management** → **Users** → **Create User**:
 Add to `infra/terraform.tfvars`:
 
 ```hcl
+
 # Auth0 Configuration
 auth0_domain   = "your-tenant.auth0.com"
 auth0_audience = "https://api.vehicle-wellness-center.com"  # Your existing API identifier
@@ -146,6 +147,7 @@ Add to `.gitignore`:
 Keep `.env.example` for documentation:
 
 ```env
+
 # Auth0 Configuration
 VITE_AUTH0_DOMAIN=your-tenant.auth0.com
 VITE_AUTH0_CLIENT_ID=your_spa_client_id

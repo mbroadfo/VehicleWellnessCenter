@@ -334,6 +334,7 @@ async getVehicleSafety(vehicleId: string): Promise<SafetyData> {
 
 **Before migration:**
 ```bash
+
 # Run tests - see Parameter Store failures
 npm test -- vehicleSafety.test.ts
 # Expected: 9 pass, but stderr shows Parameter Store write failures
@@ -341,6 +342,7 @@ npm test -- vehicleSafety.test.ts
 
 **After migration:**
 ```bash
+
 # Run tests - no Parameter Store calls
 npm test -- vehicleSafety.test.ts
 # Expected: 9 pass, clean output, no cache warnings

@@ -205,6 +205,65 @@ CONVERSATIONAL GUIDELINES:
 ✅ Explain what you're doing: "Let me check your vehicle details first..."
 ✅ For fuel economy/safety/specs: Use getVehicleOverview and extract the specific data requested
 
+INITIAL GREETING FORMAT (CRITICAL - FOLLOW EXACTLY):
+When user first opens chat with a vehicle, you MUST:
+1. Call getVehicleSafety to load complete recall and complaint data
+2. Present ALL sections below in this exact format with ACTUAL data:
+
+## 📋 Vehicle Overview
+- Year, Make, Model (from pre-loaded context)
+- VIN (from pre-loaded context)
+- Engine: [cylinders] cyl, [displacement]L [fuel type] (from context)
+- Fuel Economy: [city]/[highway]/[combined] MPG (from context)
+
+## ⚠️ Safety Recalls ([count] found)
+
+**AI Summary:**
+[After calling getVehicleSafety, provide a 2-3 sentence executive summary:
+- What components are most affected?
+- Are any recalls safety-critical (airbags, brakes, steering)?
+- Any patterns or common manufacturer issues?]
+
+**Recall Details:**
+[List actual recalls:
+- For each recall show: NHTSA Campaign #, Component, Summary
+- Keep summaries concise (1-2 lines each)
+- List ALL recalls, don't truncate]
+
+📝 **Your Notes on Recalls**
+_[This section is empty - user can add their own summary or notes about recall status]_
+
+## 💬 Customer Complaints ([count] found)
+
+**AI Summary:**
+[After analyzing complaints from getVehicleSafety, provide a 2-3 sentence overview:
+- What are the most common failure points?
+- Are complaints increasing over time or clustered in specific model years?
+- Any severe safety concerns mentioned repeatedly?]
+
+**Complaint Categories:**
+[Show top complaint patterns:
+- Group by component (e.g., "Air Bags: 45 complaints")
+- Show 5-7 most common categories
+- Brief description of typical issues for each]
+
+📝 **Your Experience Summary**
+_[This section is empty - user can describe if they've experienced similar issues]_
+
+## 🔧 Maintenance Records
+[Call listVehicleEvents - if events exist, list them here]
+
+📝 **Add Service Records**
+
+**Paste from Dealer Portal:**
+_[Empty - paste your dealer maintenance history here]_
+
+**Or just tell me:** "Oil change yesterday" or "New tires last month, $800"
+
+---
+
+Ready to help! What would you like to add or track?
+
 REMEMBER: You are the trusted curator of vehicle data. Be accurate, helpful, and 
 maintain data integrity at all times.
 `;
@@ -516,6 +575,7 @@ export const handler = async (
     let vehicleContext = '';
     
     // If this is a new session with a vehicleId, automatically load vehicle data
+    // and force the AI to present the full structured report
     if (request.vehicleId && isNewSession) {
       try {
         console.log(`Auto-loading vehicle context for ${request.vehicleId}`);
@@ -539,13 +599,23 @@ export const handler = async (
 `;
         
         console.log(`Loaded vehicle context: ${v.year} ${v.make} ${v.model}`);
+        
+        // Override user message to force structured report on first greeting
+        userMessage = `[Context: User is viewing vehicle ${request.vehicleId}]
+${vehicleContext}
+
+CRITICAL INSTRUCTION: This is the FIRST message in a new conversation. You MUST present the complete structured vehicle report with ALL sections as specified in your INITIAL GREETING FORMAT instructions. User said: "${request.message}"
+
+Present the complete report now, including all empty sections for user input.`;
+        
       } catch (error) {
         console.error('Failed to load vehicle context:', error);
         // Continue without context - AI can still call getVehicleOverview if needed
+        if (request.vehicleId) {
+          userMessage = `[Context: User is viewing vehicle ${request.vehicleId}]\n${request.message}`;
+        }
       }
-    }
-    
-    if (request.vehicleId) {
+    } else if (request.vehicleId) {
       userMessage = `[Context: User is viewing vehicle ${request.vehicleId}]\n${vehicleContext}\n${request.message}`;
     }
 

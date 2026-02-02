@@ -4,6 +4,7 @@ import { apiClient, type Vehicle } from './lib/api';
 import VehicleReport from './components/VehicleReport';
 import ChatPane from './components/ChatPane';
 import AddVehicleModal from './components/AddVehicleModal';
+import AddMaintenanceModal from './components/AddMaintenanceModal';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [loadingSpecs, setLoadingSpecs] = useState<Record<string, boolean>>({});
   const [loadingSafety, setLoadingSafety] = useState<Record<string, boolean>>({});
   const [loadingFuelEconomy, setLoadingFuelEconomy] = useState<Record<string, boolean>>({});
@@ -272,6 +274,20 @@ function App() {
     setVehicleToDelete(null);
   };
 
+  const handleMaintenanceAdded = async () => {
+    // Refresh active vehicle to show new event
+    const activeVehicle = vehicles[activeVehicleIndex];
+    if (activeVehicle?._id) {
+      const data = await apiClient.getVehicle(activeVehicle._id);
+      setVehicles(prev => prev.map(v => v._id === data._id ? data : v));
+      
+      // Show success toast
+      setToastMessage('Maintenance record added successfully');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
   // Show loading screen while Auth0 is initializing
   if (isLoading) {
     return (
@@ -327,7 +343,17 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Header */}
+      {/* Heabutton
+              onClick={() => setShowMaintenanceModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded text-sm font-medium"
+              disabled={!activeVehicle}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Add Maintenance
+            </button>
+            <der */}
       <header className="bg-primary-700 text-white p-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">Vehicle Wellness Center</h1>
@@ -439,6 +465,16 @@ function App() {
         onClose={() => setShowAddModal(false)}
         onVehicleAdded={handleVehicleAdded}
       />
+
+      {/* Add Maintenance Modal */}
+      {activeVehicle && (
+        <AddMaintenanceModal
+          isOpen={showMaintenanceModal}
+          onClose={() => setShowMaintenanceModal(false)}
+          vehicleId={activeVehicle._id}
+          onMaintenanceAdded={handleMaintenanceAdded}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmDeleteModal

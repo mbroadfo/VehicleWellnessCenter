@@ -1497,6 +1497,7 @@ ${data.details}
 ### Step 5: Deploy with Terraform
 
 ```hcl
+
 # Add to lambda.tf
 
 resource "aws_lambda_function" "new_integration" {
@@ -1677,6 +1678,7 @@ All logs written as JSON for easy parsing:
 **Query Examples:**
 
 ```text
+
 # Find all errors
 fields @timestamp, message, error
 | filter level = "error"
@@ -1782,6 +1784,7 @@ describe('AI Integration Layer', () => {
 ### Load Testing
 
 ```bash
+
 # Use Artillery or similar
 artillery run load-test.yml
 

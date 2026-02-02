@@ -22,6 +22,7 @@ This guide covers setup of application secrets in AWS Systems Manager Parameter 
 ### 1. Create Parameter Template
 
 ```powershell
+
 # Copy the example template
 cp infra/parameter-example.json temp-secrets.json
 ```
@@ -57,6 +58,7 @@ aws ssm put-parameter `
 ### 4. Secure Cleanup
 
 ```powershell
+
 # Delete temporary file immediately
 Remove-Item temp-secrets.json -Force
 ```
@@ -64,6 +66,7 @@ Remove-Item temp-secrets.json -Force
 ### 5. Verify Creation
 
 ```powershell
+
 # Check parameter exists (value will show as encrypted)
 aws ssm get-parameter `
   --name /vwc/dev/secrets `
@@ -85,6 +88,7 @@ aws ssm get-parameter `
 ### Update Single Field
 
 ```powershell
+
 # 1. Get current value
 aws ssm get-parameter --name /vwc/dev/secrets --with-decryption --query Parameter.Value --output text --region us-west-2 --profile terraform-vwc > temp.json
 
